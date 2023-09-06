@@ -15,7 +15,7 @@ static void glfw_error_callback(int error, const char* description)
 
 
 // Main code
-int main(int, char**)
+int main(int argc, char** argv)
 {
     GLFWwindow* window = nullptr;
 
@@ -57,7 +57,7 @@ int main(int, char**)
         std::cout << "file manager initialisation failed" << std::endl;
     }
     
-    window = glfwCreateWindow(800, 600, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
 
     //imgui window management. From the example in imgui git.
 
@@ -80,13 +80,15 @@ int main(int, char**)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    //initiliase tiny dialog to open dialog
+    //fm->launchFileReader();
 
 
     //imgui window management. end
 
     // Our state
     bool show_demo_window = true;
-    bool show_another_window = false;
+    bool show_another_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     int n = 1000;
@@ -99,6 +101,7 @@ int main(int, char**)
     }
 
     delete[] c_i;
+    bool isObjectLoaded = false;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -114,40 +117,62 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        
+
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        //if (show_demo_window)
+        //    ImGui::ShowDemoWindow(&show_demo_window);
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+        //// 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+        //{
+        //    static float f = 0.0f;
+        //    static int counter = 0;
+
+        //    ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+        //    ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+        //    ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+        //    ImGui::Checkbox("Another Window", &show_another_window);
+
+        //    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+        //    ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+        //    if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        //        counter++;
+        //    ImGui::SameLine();
+        //    ImGui::Text("counter = %d", counter);
+
+        //    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        //    ImGui::End();
+        //}
+
+        //// 3. Show another simple window.
+
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_L)))
         {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
+            show_another_window = true;
         }
 
-        // 3. Show another simple window.
+
         if (show_another_window)
         {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
+            ImVec2 size = ImVec2(200,100);
+            ImVec2 position = ImVec2(800,0);
+            ImGui::SetNextWindowSize(size);
+            ImGui::SetNextWindowPos(position);
+            ImGui::Begin("Object Loader Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+            ImGui::Text("Load object file Here!");
+            if (ImGui::Button("Close"))
                 show_another_window = false;
+            if (ImGui::Button("Load Object file!"))
+            {
+                std::cout << "file launcher launched" << std::endl;
+                if (fm != nullptr)
+                {
+                    fm->launchFileReader();
+                    show_another_window = false;
+                }
+            }
             ImGui::End();
         }
 

@@ -63,6 +63,8 @@ src/fileManager.cpp
 src/initialise.cpp
 ${IMGUICORE} 
 ${IMGUIBACKENDS}
+#tiny file loader for dialogs.
+external/tinyfiledialogs/tinyfiledialogs.c
 )
 
 

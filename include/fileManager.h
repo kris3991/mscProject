@@ -37,4 +37,5 @@ public:
 	void operator=(const FileManager&) = delete;
 	static FileManager* GetInstance();
 	void readObjFile(const std::string filePath);
+	const char* launchFileReader();
 };
