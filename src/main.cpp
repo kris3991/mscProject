@@ -73,8 +73,13 @@ int main(int argc, char** argv)
         std::cout << "triangle mesh uninitialised" << std::endl;
         return 0;
     }
-    
 
+    RendererManager* rm = RendererManager::GetInstance();
+    if(rm == nullptr)
+    {
+        std::cout << "Render Manager uninitialised" << std::endl;
+        return 0;
+    }
     
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
     
@@ -117,10 +122,10 @@ int main(int argc, char** argv)
     int* c_i = new int[n];
     test(c_i, n);
 
-    // Output the result
-    for (int i = 0; i < n; i++) {
-        std::cout << "c[" << i << "] = " << c_i[i] << std::endl;
-    }
+    //// Output the result
+    //for (int i = 0; i < n; i++) {
+    //    std::cout << "c[" << i << "] = " << c_i[i] << std::endl;
+    //}
 
     delete[] c_i;
     bool isObjectLoaded = false;
@@ -128,11 +133,6 @@ int main(int argc, char** argv)
 
     while (!glfwWindowShouldClose(window))
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
         
         // Start the Dear ImGui frame
@@ -203,6 +203,7 @@ int main(int argc, char** argv)
         {
             fm->readObjFile(objFileName, tm);
             processObjFile = false;
+            rm->fillRenderTriangles(tm);
         }
        
 

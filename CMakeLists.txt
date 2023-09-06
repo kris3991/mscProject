@@ -67,6 +67,10 @@ ${IMGUIBACKENDS}
 external/tinyfiledialogs/tinyfiledialogs.c
 #triangle class
 src/triangle.cpp
+#renderer class
+src/renderer.cpp
+#shaders.
+src/shaderManager.cpp
 )
 
 
@@ -104,7 +108,14 @@ foreach(HEADER ${HEADER_FILES})
     source_group("Header Files" FILES ${HEADER})
 endforeach()
 
-# add_custom_command(
+
+add_custom_target(copy_shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/resources ${CMAKE_BINARY_DIR}/resources
+)
+
+
+add_dependencies(${PROJECT_NAME} copy_shaders)
+
     
     
 

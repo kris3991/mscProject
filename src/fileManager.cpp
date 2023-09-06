@@ -53,13 +53,13 @@ void FileManager::readObjFile(const std::string filePath, TriangleMesh* tm)
 		{
 			face f;
 			char slash;
+			ss >> f.v0 >> slash >> f.t0 >> slash >> f.n0;
 			ss >> f.v1 >> slash >> f.t1 >> slash >> f.n1;
 			ss >> f.v2 >> slash >> f.t2 >> slash >> f.n2;
-			ss >> f.v3 >> slash >> f.t3 >> slash >> f.n3;
 			// Convert to 0-based index
+			f.v0--; f.t0--; f.n0--;
 			f.v1--; f.t1--; f.n1--;
 			f.v2--; f.t2--; f.n2--;
-			f.v3--; f.t3--; f.n3--;
 			tm->faces.push_back(f);
 		}
 		++count;

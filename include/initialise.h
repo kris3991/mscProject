@@ -30,7 +30,8 @@
 #endif
 #include <GLFW/glfw3.h> 
 
-#include "../include/fileManager.h"
+
+#include "../include/shaderManager.h"
 
 
 extern std::string objFileName;
