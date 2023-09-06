@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../include/triangle.h"
+
 class FileManager
 {
 	//class is used to read the obj files and manageOperations.
@@ -36,6 +38,6 @@ public:
 	FileManager(FileManager& other) = delete;
 	void operator=(const FileManager&) = delete;
 	static FileManager* GetInstance();
-	void readObjFile(const std::string filePath);
+	void readObjFile(const std::string filePath, TriangleMesh* tm);
 	const char* launchFileReader();
 };

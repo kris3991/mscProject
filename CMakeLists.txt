@@ -65,6 +65,8 @@ ${IMGUICORE}
 ${IMGUIBACKENDS}
 #tiny file loader for dialogs.
 external/tinyfiledialogs/tinyfiledialogs.c
+#triangle class
+src/triangle.cpp
 )
 
 

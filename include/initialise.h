@@ -32,6 +32,7 @@
 
 #include "../include/fileManager.h"
 
+
 extern std::string objFileName;
 
 
@@ -52,6 +53,5 @@ public:
 	Initialisation(Initialisation& other) = delete;
 	void operator=(const Initialisation&) = delete; 
 	static Initialisation* GetInstance();
-	void objFileWindowHandler(bool &state, FileManager* fm);
 	//void readObjFile(const std::string filePath);
 };

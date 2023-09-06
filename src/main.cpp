@@ -22,6 +22,7 @@ std::string objFileName = std::string();
 int main(int argc, char** argv)
 {
     GLFWwindow* window = nullptr;
+    ImVec2 windowSize;
 
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -50,18 +51,33 @@ int main(int argc, char** argv)
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
 
+
+    //initialise all the singletons.
     Initialisation* initManager = Initialisation::GetInstance();
     if (initManager == nullptr)
     {
         std::cout << "initialisation failed" << std::endl;
+        return 0;
     }
+
     FileManager* fm = FileManager::GetInstance();
     if(fm == nullptr)
     {
         std::cout << "file manager initialisation failed" << std::endl;
+        return 0;
+    }
+
+    TriangleMesh* tm = TriangleMesh::GetInstance();
+    if(tm == nullptr)
+    {
+        std::cout << "triangle mesh uninitialised" << std::endl;
+        return 0;
     }
     
+
+    
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
+    
 
     //imgui window management. From the example in imgui git.
 
@@ -92,7 +108,10 @@ int main(int argc, char** argv)
 
     // Our state
     bool showLoaderWindow = true;
+    bool processObjFile = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+
 
     int n = 1000;
     int* c_i = new int[n];
@@ -115,13 +134,18 @@ int main(int argc, char** argv)
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
-
+        
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        //size management
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+
         //launch obj file loader.
+        
 
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_L)))
         {
@@ -131,14 +155,61 @@ int main(int argc, char** argv)
 
         if (showLoaderWindow)
         {
-            initManager->objFileWindowHandler(showLoaderWindow, fm);
+           //object loading window.
+            bool loadAgain = false;
+            ImVec2 size = ImVec2(200, 100);
+            
+            ImVec2 position = ImVec2(display_w - display_w /6, display_h - (display_h - display_h/20));
+            ImGui::SetNextWindowSize(size);
+            ImGui::SetNextWindowPos(position);
+            ImGui::Begin("Object Loader Window", &showLoaderWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+            ImGui::Text("Load object file Here!");
+            if (ImGui::Button("Close"))
+            {
+                showLoaderWindow = false;
+
+            }
+            if (showLoaderWindow && ImGui::Button("Load Object file!"))
+            {
+                std::cout << "file launcher launched" << std::endl;
+                if (fm != nullptr)
+                {
+                    const char* objFile = fm->launchFileReader();
+                    if (objFile == nullptr)
+                    {
+                        ImGui::Begin("Object loading failed", &showLoaderWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+                        ImGui::Text("Select Another Window!");
+                        if (ImGui::Button("Close"));
+                        loadAgain = true;
+                        
+                    }
+                    else
+                        objFileName = objFile;
+                    if (objFileName.find("obj") == std::string::npos)
+                    {
+                        std::cout << "Wrong format selected" << std::endl;
+                        loadAgain = true;
+                    }
+                    else
+                        processObjFile = true;
+                    showLoaderWindow = loadAgain;
+
+                }
+            }
+            ImGui::End();
         }
+
+        if (processObjFile)
+        {
+            fm->readObjFile(objFileName, tm);
+            processObjFile = false;
+        }
+       
 
 
         // Rendering
         ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
+       
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
