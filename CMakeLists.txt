@@ -27,7 +27,7 @@
 # # target_include_directories(vector_addition PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 cmake_minimum_required(VERSION 3.12)
-project(CUDA_Vector_Addition)
+project(MScProject)
 
 # Find CUDA
 find_package(CUDA REQUIRED)
@@ -55,7 +55,12 @@ set(IMGUIBACKENDS "${IMGUIDIR}/backends/imgui_impl_opengl3.cpp"
 # Specify the source files (only the CUDA source file)
 set(SOURCES 
 src/main.cpp
+#test file to verify build
 src/vector_addition.cu
+#file management.
+src/fileManager.cpp
+#initilise
+src/initialise.cpp
 ${IMGUICORE} 
 ${IMGUIBACKENDS}
 )

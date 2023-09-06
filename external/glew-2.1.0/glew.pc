@@ -1,6 +1,6 @@
-prefix=C:/Program Files (x86)/CUDA_Vector_Addition
+prefix=C:/Program Files (x86)/MScProject
 exec_prefix=${prefix}
-libdir=C:/Program Files (x86)/CUDA_Vector_Addition/lib
+libdir=C:/Program Files (x86)/MScProject/lib
 includedir=${prefix}/include
 
 Name: glew

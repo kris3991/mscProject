@@ -29,3 +29,26 @@
 #include <GLES2/gl2.h>
 #endif
 #include <GLFW/glfw3.h> 
+
+#include "../include/fileManager.h"
+
+
+
+
+class Initialisation
+{
+	//class is used to read the obj files and manageOperations.
+	//to be extended to triangle meshes as well.
+	//should be singleton
+
+protected:
+	Initialisation();
+
+	static Initialisation* initialise;
+
+public:
+	Initialisation(Initialisation& other) = delete;
+	void operator=(const Initialisation&) = delete; 
+	static Initialisation* GetInstance();
+	//void readObjFile(const std::string filePath);
+};

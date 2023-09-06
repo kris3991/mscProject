@@ -1,34 +1,9 @@
-#ifdef _WIN32
-#include <windows.h>
-#include <direct.h>
-#else
-#include <unistd.h>
-#include <limits.h>
-#endif
 
-#include <iostream>
-#include <stdio.h>
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include <glm/common.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include "../external/stb_image.h"
-
-#include <string>
-#include <thread>
-#include <mutex>
+#include "../include/test.cuh"
+#include "../include/initialise.h"
+#include "../include/fileManager.h"
 
 
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include <stdio.h>
-#define GL_SILENCE_DEPRECATION
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#endif
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -70,12 +45,15 @@ int main(int, char**)
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
 #else
     // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
+    const char* glsl_version = "#version 330";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
+
+    FileManager* filemanager = FileManager::GetInstance();
+    assert(filemanager);
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
@@ -120,6 +98,17 @@ int main(int, char**)
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    int n = 1000;
+    int* c_i = new int[n];
+    test(c_i, n);
+
+    // Output the result
+    for (int i = 0; i < n; i++) {
+        std::cout << "c[" << i << "] = " << c_i[i] << std::endl;
+    }
+
+    delete[] c_i;
 
     // Main loop
 #ifdef __EMSCRIPTEN__
