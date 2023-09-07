@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/common.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "../external/stb_image.h"
 
 #include <string>
@@ -31,7 +32,7 @@
 #include <GLFW/glfw3.h> 
 
 
-#include "../include/shaderManager.h"
+#include "../include/renderer.h"
 
 
 extern std::string objFileName;

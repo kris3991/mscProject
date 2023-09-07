@@ -125,8 +125,6 @@ int main(int argc, char** argv)
     // Our state
     bool showLoaderWindow = true;
     bool processObjFile = false;
-    bool render = false;
-    bool succesfullLoad = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
@@ -152,111 +150,41 @@ int main(int argc, char** argv)
     }
     glEnable(GL_DEPTH_TEST);
 
-    //load shader.
+    //load shaders.
+    //load shaders.
+
+
+    
+    
+
+    fm->readObjFile("C:/Users/gopik/OneDrive/Desktop/gitCheckout/mscProject/Models/sphere.obj", tm);
     sm->createShaderProgram();
-   
+    rm->fillRenderTriangles(tm);
+    rm->assignRenderModel(sm, true);
+    
+
+
     while (!glfwWindowShouldClose(window))
     {
-        glfwPollEvents();
-
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        //size management
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-
-        //launch obj file loader.
-
-
-        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_L)))
-        {
-            showLoaderWindow = true;
-        }
-
-
-        if (showLoaderWindow)
-        {
-
-
-            //object loading window.
-            bool loadAgain = false;
-            ImVec2 size = ImVec2(200, 100);
-            ImGui::SetNextWindowSize(size);
-            ImGui::Begin("Object Loader Window", &showLoaderWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Load object file Here!");
-            if (ImGui::Button("Close"))
-            {
-                showLoaderWindow = false;
-
-            }
-            if (showLoaderWindow && ImGui::Button("Load Object file!"))
-            {
-                std::cout << "file launcher launched" << std::endl;
-                if (fm != nullptr)
-                {
-                    const char* objFile = fm->launchFileReader();
-                    if (objFile == nullptr)
-                    {
-                        ImGui::Begin("Object loading failed", &showLoaderWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-                        ImGui::Text("Select Another Window!");
-                        if (ImGui::Button("Close"));
-                        loadAgain = true;
-
-                    }
-                    else
-                        objFileName = objFile;
-                    if (objFileName.find("obj") == std::string::npos)
-                    {
-                        std::cout << "Wrong format selected" << std::endl;
-                        loadAgain = true;
-                    }
-                    else
-                    {
-                        fm->readObjFile(objFileName, tm);
-                        processObjFile = false;
-                        rm->fillRenderTriangles(tm);
-                        rm->fillRenderTriangles(tm);
-                        rm->assignRenderModel(sm, true);
-                        succesfullLoad = true;
-                        render = true;
-                        loadAgain = true;
-                    }
-                    showLoaderWindow = loadAgain;
-
-                }
-            }
-            ImGui::End();
-        }
-        //clear screen
-        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_C)))
-        {
-            rm->clearBuffer();
-            render = false;
-        }
-       
-        // Rendering
-        ImGui::Render();
-
-        glViewport(0, 0, display_w, display_h);
-        rm->clearBuffer();
-        
-        if (render)
+        if (1)
         {
             rm->drawModel(sm);
         }
+        else
+        {
+            rm->clearBuffer();
+        }
 
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        //rendering end
+        glfwPollEvents();
         glfwSwapBuffers(window);
     }
 
 
-    // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    //// Cleanup
+    //ImGui_ImplOpenGL3_Shutdown();
+    //ImGui_ImplGlfw_Shutdown();
+    //ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
     glfwTerminate();
