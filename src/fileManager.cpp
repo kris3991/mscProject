@@ -34,7 +34,6 @@ void FileManager::readObjFile(const std::string filePath, TriangleMesh* tm)
 		if (attribute == "v")
 		{
 			glm::vec3 vertex;
-			ss >> vertex.x >> vertex.y >> vertex.z;
 			tm->vertices.push_back(vertex);
 		}
 		else if (attribute == "vt")
@@ -60,7 +59,16 @@ void FileManager::readObjFile(const std::string filePath, TriangleMesh* tm)
 			f.v0--; f.t0--; f.n0--;
 			f.v1--; f.t1--; f.n1--;
 			f.v2--; f.t2--; f.n2--;
+			Edge e0, e1, e2;
+
+			//for rendering.
 			tm->faces.push_back(f);
+
+			//basically the face data structure.
+			tm->faceVector.push_back(f.v0);
+			tm->faceVector.push_back(f.v1);
+			tm->faceVector.push_back(f.v2);
+
 		}
 		++count;
 	}

@@ -32,7 +32,7 @@
 #include <GLFW/glfw3.h> 
 
 
-#include "../include/renderer.h"
+#include "../include/halfedge.h"
 
 
 extern std::string objFileName;

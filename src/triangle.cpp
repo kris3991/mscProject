@@ -20,4 +20,6 @@ void TriangleMesh::clear()
     normals.clear();
     textures.clear();
     faces.clear();
+    faceVector.clear();
 }
+

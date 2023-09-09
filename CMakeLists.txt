@@ -71,6 +71,10 @@ src/triangle.cpp
 src/renderer.cpp
 #shaders.
 src/shaderManager.cpp
+#components.
+src/componentMananger.cpp
+#halfedge
+src/halfedge.cpp
 )
 
 

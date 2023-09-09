@@ -91,6 +91,13 @@ int main(int argc, char** argv)
         std::cout << "Shader Manager uninitialised" << std::endl;
         return 0;
     }
+
+    ComponentManager* cm = ComponentManager::GetInstance();
+    if (cm == nullptr)
+    {
+        std::cout << "component manager creation failed" << std::endl;
+        return 0;
+    }
     
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
     
@@ -216,13 +223,20 @@ int main(int argc, char** argv)
                     else
                     {
                         fm->readObjFile(objFileName, tm);
+                        if (!tm->vertices.size() || !tm->faces.size() || !tm->faceVector.size())
+                        {
+                            std::cout << "file reading failed" << std::endl;
+                            return 0;
+                        }
                         processObjFile = false;
-                        rm->fillRenderTriangles(tm);
                         rm->fillRenderTriangles(tm);
                         rm->assignRenderModel(sm, true);
                         succesfullLoad = true;
                         render = true;
                         loadAgain = true;
+                        cm->initialiseMatrices(tm->vertices.size());
+                        cm->findComponents(tm);
+
                     }
                     showLoaderWindow = loadAgain;
 
