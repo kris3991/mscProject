@@ -35,7 +35,18 @@ public:
 	std::map<int, HalfEdgeStruct> hES;
 	std::map<int, std::vector<int>> vertexHes;
 	std::map<int, bool> normalsCalculated;
-
+	//adjascency matrix for bfs.
+	std::map<int, std::set<int>> adjascencyList;
+	//queue for bfs
+	std::queue<int> bfsQueue;
+	//visited map.
+	std::map<int, bool> visited;
+	//distance
+	std::map<int, int> geodesicDistance;
+	//processing time for geodesic
+	std::chrono::duration<double> geodesicProcessingTime;
+	//calculation time.
+	std::chrono::duration<double> geodesicCalcTime;
     
 	HalfEdge(HalfEdge& other) = delete;
 	void operator=(const HalfEdge&) = delete; 
@@ -45,4 +56,6 @@ public:
 	int querySize;
 	void calculateOneRing(int vertex);
 	void calculateNormals(TriangleMesh* tm, std::string fileName);
+	void fillAdjascencyList(TriangleMesh* tm);
+	void bfs(int source, std::string fileName, TriangleMesh* tm);
 };

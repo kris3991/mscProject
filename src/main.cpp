@@ -136,12 +136,13 @@ int main(int argc, char** argv)
 
     //imgui window management. end
 
-    // Our state
+    // states for rendering windows
     bool showLoaderWindow = true;
     bool processObjFile = false;
     bool render = false;
     bool succesfullLoad = false;
     bool showHalfEdgeQueryWindow = false;
+    bool bfs = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
@@ -245,6 +246,7 @@ int main(int argc, char** argv)
                         cm->initialiseMatrices(tm->vertices.size());
                         cm->findComponents(tm);
                         he->initialiseEdges(tm);
+                        he->fillAdjascencyList(tm);
                         //he->initialise(tm);
 
                     }
@@ -260,6 +262,13 @@ int main(int argc, char** argv)
             rm->clearBuffer();
             render = false;
         }
+
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_B)))
+        {
+            bfs = true;
+        }
+
+        
 
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_H)))
         {
@@ -298,23 +307,63 @@ int main(int argc, char** argv)
             if(he->querySize)
                 vertexSize = he->querySize;
             static char str[256] = {};
-            ImGui::Text(limit.c_str());
-            ImGui::InputText(":Vertex", &str[0], IM_ARRAYSIZE(str));
-            
-            if (ImGui::Button("Calculate one ring")) {
-                std::string vertString = std::string(str);
-                int vertex = stoi(vertString);
-                if (vertex < 0 || vertex > vertexSize)
-                    std::cout << "invalid vertex size" << std::endl;
-                else
-                {
-                    he->calculateOneRing(vertex);
+            if (limit.size())
+            {
+                ImGui::Text(limit.c_str());
+                ImGui::InputText(":Vertex", &str[0], IM_ARRAYSIZE(str));
+
+                if (ImGui::Button("Calculate one ring")) {
+                    std::string vertString = std::string(str);
+                    int vertex = stoi(vertString);
+                    if (vertex < 0 || vertex > vertexSize)
+                        std::cout << "invalid vertex size" << std::endl;
+                    else
+                    {
+                        he->calculateOneRing(vertex);
+                    }
                 }
             }
+            else
+                std::cout << "the query box is empty" << std::endl;
             if (ImGui::Button("Close")) {
                 showHalfEdgeQueryWindow = false;
             }
             ImGui::End();
+        }
+
+        if (bfs)
+        {
+            ImVec2 size = ImVec2(400, 150);
+            ImGui::SetNextWindowSize(size);
+            ImGui::Begin("Calculate Geodesic distances:", &bfs);
+
+            std::string limit = std::string("Enter the a vertex value less than ") + std::to_string(he->querySize);
+            int vertexSize = 0;
+            if (he->querySize)
+                vertexSize = he->querySize;
+            static char str[256] = {};
+            if (limit.size())
+            {
+                ImGui::Text(limit.c_str());
+                ImGui::InputText(":Vertex", &str[0], IM_ARRAYSIZE(str));
+                if (ImGui::Button("calculate")) {
+                    std::string vertString = std::string(str);
+                    int vertex = stoi(vertString);
+                    if (vertex < 0 || vertex > vertexSize)
+                        std::cout << "invalid vertex size" << std::endl;
+                    else
+                    {
+                        he->bfs(vertex, "geodesic.txt", tm);
+                    }
+                }
+            }
+            else
+                std::cout << "input is empty" << std::endl;
+            if (ImGui::Button("Close")) {
+                bfs = false;
+            }
+            ImGui::End();
+
         }
        
         // Rendering
