@@ -110,7 +110,7 @@ void HalfEdge::calculateOneRing(int vertex)
 {
     std::set<int> oneRing;
     int size = vertexHes[vertex].size();
-    std::cout << "the vertex: " << vertex << " is in" << size << " faces" << std::endl;
+    std::cout << "the vertex:\t" << vertex << "is in\t" << size << " faces" << std::endl;
     const auto startTime = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < size; ++i)
     {
@@ -124,8 +124,8 @@ void HalfEdge::calculateOneRing(int vertex)
     }
     const auto endTime = std::chrono::high_resolution_clock::now();
     auto delta = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    std::cout << "time taken: " << delta << std::endl;
-    std::cout << "vertices are" << std::endl;
+    std::cout << "time taken:\t" << delta << std::endl;
+    std::cout << "vertices are\t" << std::endl;
     for (std::set<int>::iterator itr = oneRing.begin();
         itr != oneRing.end(); itr++)
     {
@@ -268,9 +268,11 @@ void HalfEdge::bfs(int source, std::string fileName, TriangleMesh* tm)
             }
             const auto endTime = std::chrono::high_resolution_clock::now();
             geodesicCalcTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-            bfsFile << "Geodesic distance" << tm->faceVector.size() << std::endl;
-            bfsFile << "Number of vertices: " << tm->vertices.size() << std::endl;
-            bfsFile << "Number of faces: " << tm->faceVector.size() << std::endl;
+            bfsFile << "Geodesic distance"  << std::endl;
+            bfsFile << "Initial Processing time:\t"<< geodesicProcessingTime << std::endl;
+            bfsFile << "calculation time:\t" << geodesicCalcTime << std::endl;
+            bfsFile << "Number of vertices:\t" << tm->vertices.size() << std::endl;
+            bfsFile << "Number of faces:\t" << tm->faceVector.size() << std::endl;
             bfsFile << "Source " << source << std::endl;
             for (int i = 0; i < geodesicDistance.size(); ++i)
             {
