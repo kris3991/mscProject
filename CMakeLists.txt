@@ -40,7 +40,7 @@ add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 #common vars
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 20)
 
 #setup Imgui
 set(IMGUIDIR "external/imgui")

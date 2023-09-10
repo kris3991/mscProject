@@ -98,6 +98,13 @@ int main(int argc, char** argv)
         std::cout << "component manager creation failed" << std::endl;
         return 0;
     }
+
+    HalfEdge* he = HalfEdge::GetInstance();
+    if (he == nullptr)
+    {
+        std::cout << "halfedge initialisation failed" << std::endl;
+        return 0;
+    } 
     
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
     
@@ -134,6 +141,7 @@ int main(int argc, char** argv)
     bool processObjFile = false;
     bool render = false;
     bool succesfullLoad = false;
+    bool showHalfEdgeQueryWindow = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
@@ -236,6 +244,8 @@ int main(int argc, char** argv)
                         loadAgain = true;
                         cm->initialiseMatrices(tm->vertices.size());
                         cm->findComponents(tm);
+                        he->initialiseEdges(tm);
+                        //he->initialise(tm);
 
                     }
                     showLoaderWindow = loadAgain;
@@ -249,6 +259,62 @@ int main(int argc, char** argv)
         {
             rm->clearBuffer();
             render = false;
+        }
+
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_H)))
+        {
+            if (!tm->vertices.size() && !he->hES.size())
+            {
+                std::cout << "invalid data" << std::endl;
+            }
+            else
+            {
+                he->calculateNormals(tm, "normals.txt");
+            }
+        }
+
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_O)))
+        {
+            if (!tm->vertices.size())
+                std::cout << "vertices are empty" << std::endl;
+            if (!he->hES.size())
+                std::cout << "halfedges are empty" << std::endl;
+            if (!he->querySize)
+                std::cout << "query size calculation is invalid" << std::endl;
+            if(tm->vertices.size() && he->hES.size() && he->querySize)
+                showHalfEdgeQueryWindow = true;
+
+        }
+
+        
+
+        if (showHalfEdgeQueryWindow) {
+            ImVec2 size = ImVec2(400, 150);
+            ImGui::SetNextWindowSize(size);
+            ImGui::Begin("One Ring calculation", &showHalfEdgeQueryWindow);
+            
+            std::string limit = std::string("Enter the a vertex value less than ") + std::to_string(he->querySize);
+            int vertexSize = 0;
+            if(he->querySize)
+                vertexSize = he->querySize;
+            static char str[256] = {};
+            ImGui::Text(limit.c_str());
+            ImGui::InputText(":Vertex", &str[0], IM_ARRAYSIZE(str));
+            
+            if (ImGui::Button("Calculate one ring")) {
+                std::string vertString = std::string(str);
+                int vertex = stoi(vertString);
+                if (vertex < 0 || vertex > vertexSize)
+                    std::cout << "invalid vertex size" << std::endl;
+                else
+                {
+                    he->calculateOneRing(vertex);
+                }
+            }
+            if (ImGui::Button("Close")) {
+                showHalfEdgeQueryWindow = false;
+            }
+            ImGui::End();
         }
        
         // Rendering

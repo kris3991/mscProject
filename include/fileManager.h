@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//tiny
+#include "../external/tinyfiledialogs/tinyfiledialogs.h"
+
 #include "../include/triangle.h"
 
 class FileManager

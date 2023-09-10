@@ -3,6 +3,12 @@
 #include <GL/glew.h>
 #include <glm/common.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <map>
+#include <set>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <numeric>
 
 
 struct face
@@ -12,11 +18,6 @@ struct face
     GLuint t0, t1, t2;     // Texture coordinate indices //just for symmetry :D
 };
 
-struct Edge
-{
-	int v0;
-	int v1;
-};
 
 class TriangleMesh
 {
