@@ -55,7 +55,7 @@ public:
 	void initialiseEdges(TriangleMesh* tm);
 	int querySize;
 	void calculateOneRing(int vertex);
-	void calculateNormals(TriangleMesh* tm, std::string fileName);
+	void calculateNormals(TriangleMesh* tm, FileManager* fm);
 	void fillAdjascencyList(TriangleMesh* tm);
-	void bfs(int source, std::string fileName, TriangleMesh* tm);
+	void bfs(int source, TriangleMesh* tm, FileManager* fm);
 };

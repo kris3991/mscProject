@@ -136,63 +136,41 @@ void HalfEdge::calculateOneRing(int vertex)
 
 
 
-void HalfEdge::calculateNormals(TriangleMesh* tm, std::string fileName)
+void HalfEdge::calculateNormals(TriangleMesh* tm, FileManager* fm)
 {
-	if (!fileName.size())
-		std::cout << "invlid fileName" << std::endl;
-	else
+
+	//for cases where there are less number of normals.
+	if (tm->normals.size() < tm->vertices.size())
 	{
-		std::ofstream normalFile(fileName);
-		if (!normalFile.is_open())
-		{
-			std::cerr << "Can't open file: " << fileName << std::endl;
-			return;
-		}
-		else
-		{
-
-			//for cases where there are less number of normals.
-			if (tm->normals.size() < tm->vertices.size())
-			{
-				tm->normals.resize(tm->vertices.size());
-			}
-            const auto startTime = std::chrono::high_resolution_clock::now();
-			for (int i = 0; i < tm->faceVector.size(); i += 3)
-			{
-				int currVertex = tm->faceVector[i];
-				int nextVertex = tm->faceVector[i + 1];
-				int previousVertex = tm->faceVector[i + 2];
-
-				const glm::vec3 currVertexPos = tm->vertices[currVertex];
-				const glm::vec3 nextVertexPos = tm->vertices[nextVertex];
-				const glm::vec3 prevVertexPos = tm->vertices[previousVertex];
-
-				const glm::vec3 vec1 = nextVertexPos - currVertexPos;
-				const glm::vec3 vec2 = prevVertexPos - currVertexPos;
-
-				//fast normal calculation.
-				glm::vec3 faceNormal = glm::cross(vec1, vec2);
-
-				tm->normals[currVertex] += faceNormal;
-				tm->normals[nextVertex] += faceNormal;
-				tm->normals[previousVertex] += faceNormal;
-
-                
-			}
-            const auto endTime = std::chrono::high_resolution_clock::now();
-            auto delta = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-            normalFile << "Number of vertices: " << tm->vertices.size() << std::endl;
-            normalFile << "Number of faces: " << tm->faceVector.size() << std::endl;
-            normalFile << "time taken: " << std::endl;
-            normalFile << delta << std::endl;
-			for (int i = 0; i < tm->normals.size(); ++i)
-			{
-				normalFile << tm->normals[i].x << "\t" << tm->normals[i].y << "\t" << tm->normals[i].z << std::endl;
-			}
-            normalFile.close();
-            std::cout << "normal file written" << std::endl;
-		}
+		tm->normals.resize(tm->vertices.size());
 	}
+	const auto startTime = std::chrono::high_resolution_clock::now();
+	for (int i = 0; i < tm->faceVector.size(); i += 3)
+	{
+		int currVertex = tm->faceVector[i];
+		int nextVertex = tm->faceVector[i + 1];
+		int previousVertex = tm->faceVector[i + 2];
+
+		const glm::vec3 currVertexPos = tm->vertices[currVertex];
+		const glm::vec3 nextVertexPos = tm->vertices[nextVertex];
+		const glm::vec3 prevVertexPos = tm->vertices[previousVertex];
+
+		const glm::vec3 vec1 = nextVertexPos - currVertexPos;
+		const glm::vec3 vec2 = prevVertexPos - currVertexPos;
+
+		//fast normal calculation.
+		glm::vec3 faceNormal = glm::cross(vec1, vec2);
+
+		tm->normals[currVertex] += faceNormal;
+		tm->normals[nextVertex] += faceNormal;
+		tm->normals[previousVertex] += faceNormal;
+
+
+	}
+	const auto endTime = std::chrono::high_resolution_clock::now();
+	auto delta = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+	fm->writeNormals(tm, delta);
+
 }
 
 void HalfEdge::fillAdjascencyList(TriangleMesh* tm)
@@ -229,60 +207,33 @@ void HalfEdge::fillAdjascencyList(TriangleMesh* tm)
 
 }
 
-void HalfEdge::bfs(int source, std::string fileName, TriangleMesh* tm)
+void HalfEdge::bfs(int source, TriangleMesh* tm, FileManager* fm)
 {
-    //basic bfs implementation, referred from my old code and geek for geek,
-    if (!fileName.size())
-        std::cout << "invlid fileName" << std::endl;
-    else
-    {
-        std::ofstream bfsFile(fileName);
-        if (!bfsFile.is_open())
-        {
-            std::cerr << "Can't open file: " << fileName << std::endl;
-            return;
-        }
-        else
-        {
-            bfsQueue.push(source);
-            visited[source] = true;
-            geodesicDistance[source] = 0;
-            const auto startTime = std::chrono::high_resolution_clock::now();
-            while (!bfsQueue.empty())
-            {
-                int firstElement = bfsQueue.front();
-                bfsQueue.pop();
+	//basic bfs implementation, referred from my old code and geek for geek,
 
-                for (std::set<int>::iterator itr = adjascencyList[firstElement].begin(); itr != adjascencyList[firstElement].end(); itr++)
-                {
-                    int val = *itr;
-                    if (!visited[val])
-                    {
-                        visited[val] = true;
-                        geodesicDistance[val] = geodesicDistance[firstElement] + 1;
-                        bfsQueue.push(val);
-                    }
+	bfsQueue.push(source);
+	visited[source] = true;
+	geodesicDistance[source] = 0;
+	const auto startTime = std::chrono::high_resolution_clock::now();
+	while (!bfsQueue.empty())
+	{
+		int firstElement = bfsQueue.front();
+		bfsQueue.pop();
 
-                }
+		for (std::set<int>::iterator itr = adjascencyList[firstElement].begin(); itr != adjascencyList[firstElement].end(); itr++)
+		{
+			int val = *itr;
+			if (!visited[val])
+			{
+				visited[val] = true;
+				geodesicDistance[val] = geodesicDistance[firstElement] + 1;
+				bfsQueue.push(val);
+			}
 
-            }
-            const auto endTime = std::chrono::high_resolution_clock::now();
-            geodesicCalcTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-            bfsFile << "Geodesic distance"  << std::endl;
-            bfsFile << "Initial Processing time:\t"<< geodesicProcessingTime << std::endl;
-            bfsFile << "calculation time:\t" << geodesicCalcTime << std::endl;
-            bfsFile << "Number of vertices:\t" << tm->vertices.size() << std::endl;
-            bfsFile << "Number of faces:\t" << tm->faceVector.size() << std::endl;
-            bfsFile << "Source " << source << std::endl;
-            for (int i = 0; i < geodesicDistance.size(); ++i)
-            {
-                if (geodesicDistance[i] != std::numeric_limits<int>::max())
-                    bfsFile << "vertex: " << i << "\t" << geodesicDistance[i] << std::endl;
-                else
-                    bfsFile << "vertex: " << i << "\t" << "Disjoint component" << std::endl;
-            }
-            bfsFile.close();
-        }
-    }
+		}
 
+	}
+	const auto endTime = std::chrono::high_resolution_clock::now();
+	geodesicCalcTime = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+	fm->writeBFSdata(tm, geodesicDistance, geodesicProcessingTime, geodesicCalcTime, source);
 }

@@ -278,7 +278,7 @@ int main(int argc, char** argv)
             }
             else
             {
-                he->calculateNormals(tm, "normals.txt");
+                he->calculateNormals(tm, fm);
             }
         }
 
@@ -353,13 +353,14 @@ int main(int argc, char** argv)
                         std::cout << "invalid vertex size" << std::endl;
                     else
                     {
-                        he->bfs(vertex, "geodesic.txt", tm);
+                        he->bfs(vertex, tm, fm);
                     }
                 }
             }
             else
                 std::cout << "input is empty" << std::endl;
-            if (ImGui::Button("Close")) {
+            if (ImGui::Button("Close")) 
+            {
                 bfs = false;
             }
             ImGui::End();

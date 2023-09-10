@@ -80,3 +80,57 @@ const char* FileManager::launchFileReader()
 {
     return (tinyfd_openFileDialog ( "Select Object file to Load",	NULL,	0, NULL, NULL, 1));
 }
+
+void FileManager::writeBFSdata(TriangleMesh* tm, std::map<int, int> &geodesicDistance, std::chrono::duration<double> geodesicProcessingTime,
+	std::chrono::duration<double> geodesicCalcTime, int source)
+{
+	std::string fileName = "geodesic.txt";
+	std::ofstream bfsFile(fileName);
+        if (!bfsFile.is_open())
+        {
+            std::cerr << "Can't open file: " << fileName << std::endl;
+            return;
+        }
+        else
+        {
+			bfsFile << "Geodesic distance"  << std::endl;
+            bfsFile << "Initial Processing time:\t"<< geodesicProcessingTime << std::endl;
+            bfsFile << "calculation time:\t" << geodesicCalcTime << std::endl;
+            bfsFile << "Number of vertices:\t" << tm->vertices.size() << std::endl;
+            bfsFile << "Number of faces:\t" << tm->faceVector.size() << std::endl;
+            bfsFile << "Source " << source << std::endl;
+            for (int i = 0; i < geodesicDistance.size(); ++i)
+            {
+                if (geodesicDistance[i] != std::numeric_limits<int>::max())
+                    bfsFile << "vertex: " << i << "\t" << geodesicDistance[i] << std::endl;
+                else
+                    bfsFile << "vertex: " << i << "\t" << "Disjoint component" << std::endl;
+            }
+            bfsFile.close();
+		}
+	
+}
+
+void  FileManager::writeNormals(TriangleMesh* tm, std::chrono::duration<double> delta)
+{
+	std::string fileName = "normals.txt";
+	std::ofstream normalFile(fileName);
+	if (!normalFile.is_open())
+	{
+		std::cerr << "Can't open file: " << fileName << std::endl;
+		return;
+	}
+	else
+	{
+		normalFile << "Number of vertices: " << tm->vertices.size() << std::endl;
+		normalFile << "Number of faces: " << tm->faceVector.size() << std::endl;
+		normalFile << "time taken: " << std::endl;
+		normalFile << delta << std::endl;
+		for (int i = 0; i < tm->normals.size(); ++i)
+		{
+			normalFile << tm->normals[i].x << "\t" << tm->normals[i].y << "\t" << tm->normals[i].z << std::endl;
+		}
+		normalFile.close();
+		std::cout << "normal file written" << std::endl;
+	}
+}
