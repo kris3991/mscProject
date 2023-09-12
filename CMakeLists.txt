@@ -27,8 +27,9 @@
 # # target_include_directories(vector_addition PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 cmake_minimum_required(VERSION 3.12)
-project(MScProject)
+project(MScProject LANGUAGES CXX CUDA)
 
+set(CMAKE_CUDA_FLAGS "-arch=compute_35")
 # Find CUDA
 find_package(CUDA REQUIRED)
 
@@ -72,9 +73,11 @@ src/renderer.cpp
 #shaders.
 src/shaderManager.cpp
 #components.
-src/componentMananger.cpp
+src/componentMananger.cu
 #halfedge
 src/halfedge.cpp
+#rxMesh
+src/rxMesh.cu
 )
 
 

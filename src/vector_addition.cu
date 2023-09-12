@@ -8,12 +8,17 @@ __global__ void vectorAdd(int *a, int *b, int *c, int n) {
     }
 }
 
-void test(int* c_i, int N)
+void test()
 {
+    
+    
+  
    const int n = 1000; // Size of the vectors
     int *a, *b, *c; // Host vectors
     int *d_a, *d_b, *d_c; // Device vectors
 
+
+    int* c_i = new int[n];
     // Allocate memory on the host
     a = new int[n];
     b = new int[n];
@@ -49,5 +54,6 @@ void test(int* c_i, int N)
     // Free host memory
     delete[] a;
     delete[] b;
+    delete[] c_i;
 }
 

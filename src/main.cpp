@@ -1,5 +1,4 @@
 
-#include "../include/test.cuh"
 #include "../include/initialise.h"
 
 
@@ -104,7 +103,14 @@ int main(int argc, char** argv)
     {
         std::cout << "halfedge initialisation failed" << std::endl;
         return 0;
-    } 
+    }
+
+    preRxMeshDataStructure* rx = preRxMeshDataStructure::GetInstance();
+    if (rx == nullptr)
+    {
+        std::cout << "RxMesh structure initialisation failed" << std::endl;
+        return 0;
+    }
     
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
     
@@ -143,20 +149,19 @@ int main(int argc, char** argv)
     bool succesfullLoad = false;
     bool showHalfEdgeQueryWindow = false;
     bool bfs = false;
+    bool rxMeshStart = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
 
-    int n = 1000;
-    int* c_i = new int[n];
-    test(c_i, n);
+    
 
     //// Output the result
     //for (int i = 0; i < n; i++) {
     //    std::cout << "c[" << i << "] = " << c_i[i] << std::endl;
     //}
 
-    delete[] c_i;
+    
     bool isObjectLoaded = false;
     std::string fileName;
 
@@ -218,8 +223,8 @@ int main(int argc, char** argv)
                     {
                         ImGui::Begin("Object loading failed", &showLoaderWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
                         ImGui::Text("Select Another Window!");
-                        if (ImGui::Button("Close"));
-                        loadAgain = true;
+                        if (ImGui::Button("Close"))
+                            loadAgain = true;
 
                     }
                     else
@@ -231,6 +236,11 @@ int main(int argc, char** argv)
                     }
                     else
                     {
+                        if (objFileName.size() == 0)
+                        {
+                            std::cout << "empty file name" << std::endl;
+                            return 0;
+                        }
                         fm->readObjFile(objFileName, tm);
                         if (!tm->vertices.size() || !tm->faces.size() || !tm->faceVector.size())
                         {
@@ -243,10 +253,13 @@ int main(int argc, char** argv)
                         succesfullLoad = true;
                         render = true;
                         loadAgain = true;
+                        cm->clear();
                         cm->initialiseMatrices(tm->vertices.size());
                         cm->findComponents(tm);
                         he->initialiseEdges(tm);
                         he->fillAdjascencyList(tm);
+                        rx->initialise(tm);
+
                         //he->initialise(tm);
 
                     }
@@ -268,7 +281,10 @@ int main(int argc, char** argv)
             bfs = true;
         }
 
-        
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_R)))
+        {
+            rxMeshStart = true;
+        }
 
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_H)))
         {
@@ -366,6 +382,38 @@ int main(int argc, char** argv)
             ImGui::End();
 
         }
+
+
+        if (rxMeshStart)
+        {
+            ImVec2 size = ImVec2(450, 150);
+            ImGui::SetNextWindowSize(size);
+            ImGui::Begin("Create RxMesh", &rxMeshStart);
+            int faceCount = tm->faceVector.size() / 3;
+            std::string limit = std::string("Enter a patch size less than ") + std::to_string(faceCount);
+            int patchSize = 0;
+
+            static char str[256] = {};
+            if (limit.size())
+            {
+                ImGui::Text(limit.c_str());
+                ImGui::InputText(":Patch Size", &str[0], IM_ARRAYSIZE(str));
+                if (ImGui::Button("Create RxMesh")) {
+                    std::string patchString = std::string(str);
+                    int patchSize = stoi(patchString);
+                    {
+                        rx->h_initialiseSeedElements(tm, cm, patchSize);
+                        rx->h_fillAdjascentTriangles(tm);
+                        rxMeshStart = false;
+                    }
+                }
+            }
+            if (ImGui::Button("Close"))
+            {
+                rxMeshStart = false;
+            }
+            ImGui::End();
+        }
        
         // Rendering
         ImGui::Render();
@@ -381,6 +429,9 @@ int main(int argc, char** argv)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
+
+    //cuda cleanup
+    rx->freeCudaData();
 
 
     // Cleanup

@@ -1,4 +1,4 @@
-#include "../include/componentMananger.h"
+#include "../include/componentMananger.cuh"
 
 class HalfEdgeStruct;
 

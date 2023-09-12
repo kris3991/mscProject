@@ -32,8 +32,8 @@
 #include <GLFW/glfw3.h> 
 
 
-#include "../include/halfedge.h"
 
+#include "../include/rxMesh.cuh"
 
 
 extern std::string objFileName;
