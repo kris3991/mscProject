@@ -112,19 +112,46 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 {
 	//if you create a patch bigger than the face count. the mesh will probably get messed up during patching.
 	
-
+	
 	patchSize = ps;
 	//each face has 3 elements
 	
 	patchCount = (numFaces + patchSize - 1) / patchSize;
 	int temp{ 0 };
+	
 	if (cm->componentCount == 1)
 	{
+		//o(n2) but n is small.
 		for (int i = 0; i < patchCount; ++i)
 		{
-			temp = *select_randomly(h_faceIndexVector.begin(), h_faceIndexVector.end());
+			
+			//this is for faster convergenece.
+			//select seed points that have 3 adjascent edges, i.e. not boundary.
+			//otherwise patching algorithm will not work.
+			int next{ -1 }, previous{ -1 };
+			while (next == -1 && next == -1)
+			{
+				temp = *select_randomly(h_faceIndexVector.begin(), h_faceIndexVector.end());
+				if (temp % 3 == 2)
+				{
+					next = h_adjascentTriangles[temp - 2];
+					previous = h_adjascentTriangles[temp - 1];
+				}
+				else if (temp % 3 == 1)
+				{
+					next = h_adjascentTriangles[temp + 1];
+					previous = h_adjascentTriangles[temp - 1];
+				}
+				else
+				{
+					next = h_adjascentTriangles[temp + 1];
+					previous = h_adjascentTriangles[temp + 2];
+				}
+			}
 			h_seedElements.push_back(temp);
+
 		}
+			
 	}
 	else
 	{
@@ -138,21 +165,38 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 			int i = { 1 };
 			int begin{ 0 }, end{ 0 };
 			int temp{ 0 };
-			while (count != patchCount)
+			while (count <  patchCount)
 			{
 				int offset = (count + 1) * patchSize;
+				
 				//if for some reason you entered a patch size > component patch count, that needs to be handled
-				if (offset > cm->componentLocation[i] - cm->componentLocation[i - 1])
-					offset = (count + 1) * (cm->componentLocation[i] - cm->componentLocation[i - 1]) - 1;
-
-				if (offset > cm->componentLocation[i] && offset < totalPatchSpace)
+				if (offset > cm->componentLocation[i] - cm->componentLocation[0] && offset < totalPatchSpace)
 				{
 					i++;
-
 				}
+				
 				begin = cm->componentLocation[i - 1];
 				end = cm->componentLocation[i];
-				temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end);
+				int next{ -1 }, previous{ -1 };
+				while (next == -1 && next == -1)
+				{
+					temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end);
+					if (temp % 3 == 2)
+					{
+						next = h_adjascentTriangles[temp - 2];
+						previous = h_adjascentTriangles[temp - 1];
+					}
+					else if (temp % 3 == 1)
+					{
+						next = h_adjascentTriangles[temp + 1];
+						previous = h_adjascentTriangles[temp - 1];
+					}
+					else
+					{
+						next = h_adjascentTriangles[temp + 1];
+						previous = h_adjascentTriangles[temp + 2];
+					}
+				}
 				h_seedElements.push_back(temp);
 				count++;
 			}
@@ -161,21 +205,28 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 
 }
 
+void preRxMeshDataStructure::clear()
+{
+	h_seedElements.clear();
+	h_adjascentTriangles.clear();
+}
+
 
 void preRxMeshDataStructure::h_fillAdjascentTriangles(TriangleMesh* tm)
 {
+	clear();
 	int size_N = tm->faceVector.size();
 	int threadCount = 1 << 10;
 	if (threadCount > size_N)
 		threadCount = size_N;
 
 	int gridSize = (size_N + threadCount - 1) / threadCount;
-	std::vector<int> test(size_N, 0);
+	h_adjascentTriangles.resize(size_N);
 	int sharedMemorySize = 2 * threadCount;
+	//in a manifold the max number of faces adjascent to one face is 3, but boundary vertices have -1 in this implementation.
 	d_fillAdjascentTriangles << <gridSize, threadCount >> > (d_faceVector, d_adjascentTriangles, size_N);
-
-	cudaMemcpy(test.data(), d_adjascentTriangles, sizeofFaceVector, cudaMemcpyDeviceToHost);
-	int a = 30;
+	//copy the data for later operations.
+	cudaMemcpy(h_adjascentTriangles.data(), d_adjascentTriangles, sizeofFaceVector, cudaMemcpyDeviceToHost);
 
 }
 
@@ -183,15 +234,16 @@ __global__
 void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int size_N)
 {
 	int tId = blockDim.x * blockIdx.x + threadIdx.x;
+	int lId = threadIdx.x;
+	
 	if (tId < size_N)
 	{
 		int v0 = d_faceVector[tId];
 		int v1 = 0;
-		if(tId % 3 == 2)
+		if (tId % 3 == 2)
 			v1 = d_faceVector[tId - 2];
 		else
 			v1 = d_faceVector[tId + 1];
-
 		int v2, v3;
 		for (int i = 0; i < size_N; ++i)
 		{
@@ -202,7 +254,7 @@ void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int 
 				v3 = d_faceVector[i + 1];
 			if (v0 == v3 && v1 == v2)
 			{
-				d_adjascentTriangles[tId] = i / 3;
+				d_adjascentTriangles[tId] = i/3;
 			}
 		}
 

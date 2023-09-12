@@ -402,8 +402,8 @@ int main(int argc, char** argv)
                     std::string patchString = std::string(str);
                     int patchSize = stoi(patchString);
                     {
-                        rx->h_initialiseSeedElements(tm, cm, patchSize);
                         rx->h_fillAdjascentTriangles(tm);
+                        rx->h_initialiseSeedElements(tm, cm, patchSize);
                         rxMeshStart = false;
                     }
                 }

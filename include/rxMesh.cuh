@@ -44,7 +44,6 @@ public:
 	int numFaces;
 	//number of seed elements should be the size of patches.
 	void h_initialiseSeedElements(TriangleMesh* tm, ComponentManager* cm, int ps);
-	std::vector<int> seedElements;
 	void initialise(TriangleMesh* tm);
 
 	//all the host functions that call gpu functions will have h_ tag
@@ -52,6 +51,9 @@ public:
 	//
 	~preRxMeshDataStructure();
 	void freeCudaData();
+
+	void clear();
+
 
 };
 
