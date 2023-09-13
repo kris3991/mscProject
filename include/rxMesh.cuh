@@ -31,7 +31,9 @@ public:
 	//for patching.
 	std::vector<int> h_faceIndexVector;
 	int sizeofFaceVector;
-
+	//for multi component meshes.
+	std::vector<int> multiComponentPatchCount;
+	std::vector<int> multiComponentPatchSize;
 	//cuda pointers.
 
 	int* d_adjascentTriangles;
@@ -43,7 +45,8 @@ public:
 	int patchCount;
 	int numFaces;
 	//number of seed elements should be the size of patches.
-	void h_initialiseSeedElements(TriangleMesh* tm, ComponentManager* cm, int ps);
+	void h_initialiseSeedElements(TriangleMesh* tm, ComponentManager* cm, int pc);
+	void h_initialiseSeedElementsMultiComp(TriangleMesh* tm, ComponentManager* cm);
 	void initialise(TriangleMesh* tm);
 
 	//all the host functions that call gpu functions will have h_ tag
@@ -53,6 +56,7 @@ public:
 	void freeCudaData();
 
 	void clear();
+	void clearSeedComponents();
 
 
 };

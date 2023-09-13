@@ -108,30 +108,36 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 	}
 }
 
-void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, ComponentManager* cm, int ps)
+void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, ComponentManager* cm, int pc)
 {
 	//if you create a patch bigger than the face count. the mesh will probably get messed up during patching.
 	
 	
-	patchSize = ps;
-	//each face has 3 elements
+	patchCount = pc;
+	//each face has 3 elements]
+	//last patch will have less elements depending on the patchCount;
 	
-	patchCount = (numFaces + patchSize - 1) / patchSize;
+	patchSize = (numFaces + patchCount - 1) / patchCount;
 	int temp{ 0 };
 	
 	if (cm->componentCount == 1)
 	{
 		//o(n2) but n is small.
-		for (int i = 0; i < patchCount; ++i)
+		
+		int count{ 0 };
+		int i = { 1 };
+		int begin{ 0 }, end{ 0 };
+		int temp{ 0 };
+		while (count < patchCount)
 		{
-			
-			//this is for faster convergenece.
-			//select seed points that have 3 adjascent edges, i.e. not boundary.
-			//otherwise patching algorithm will not work.
+			end += patchSize;
+			if (end > numFaces)
+				end = numFaces;
+
 			int next{ -1 }, previous{ -1 };
-			while (next == -1 && next == -1)
+			while (next == -1 && previous == -1)
 			{
-				temp = *select_randomly(h_faceIndexVector.begin(), h_faceIndexVector.end());
+				temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end - 1);
 				if (temp % 3 == 2)
 				{
 					next = h_adjascentTriangles[temp - 2];
@@ -149,66 +155,75 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 				}
 			}
 			h_seedElements.push_back(temp);
+			begin += patchSize;
 
+			count++;
 		}
 			
 	}
-	else
+
+}
+
+void preRxMeshDataStructure::h_initialiseSeedElementsMultiComp(TriangleMesh* tm, ComponentManager* cm)
+{
+	multiComponentPatchSize.clear();
+	multiComponentPatchSize.resize(cm->componentCount);
+	
+	for (int i = 0; i < cm->componentCount; ++i)
 	{
-		//from component manager we basically have idea on where a component begins and ends.
-		//the idea is to split face data into patching data based on component size.
-		int totalPatchSpace = patchCount * patchSize;
-		
-		
+		int count{ 0 };
+		int begin = cm->componentLocation[i], end = cm->componentLocation[i];
+		int temp{ 0 };
+		int start = cm->componentLocation[i];
+		int stop = cm->componentLocation[i + 1];
+		int faceCount = stop - start;
+		multiComponentPatchSize[i] = (faceCount + multiComponentPatchCount[i] - 1) / multiComponentPatchCount[i];
+		while (count < multiComponentPatchCount[i])
+		{
+			end += multiComponentPatchSize[i];
+			if (end > numFaces)
+				end = numFaces;
 
-			int count{ 0 };
-			int i = { 1 };
-			int begin{ 0 }, end{ 0 };
-			int temp{ 0 };
-			while (count <  patchCount)
+			int next{ -1 }, previous{ -1 };
+			while (next == -1 && previous == -1)
 			{
-				int offset = (count + 1) * patchSize;
-				
-				//if for some reason you entered a patch size > component patch count, that needs to be handled
-				if (offset > cm->componentLocation[i] - cm->componentLocation[0] && offset < totalPatchSpace)
+				temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end - 1);
+				if (temp % 3 == 2)
 				{
-					i++;
+					next = h_adjascentTriangles[temp - 2];
+					previous = h_adjascentTriangles[temp - 1];
 				}
-				
-				begin = cm->componentLocation[i - 1];
-				end = cm->componentLocation[i];
-				int next{ -1 }, previous{ -1 };
-				while (next == -1 && next == -1)
+				else if (temp % 3 == 1)
 				{
-					temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end);
-					if (temp % 3 == 2)
-					{
-						next = h_adjascentTriangles[temp - 2];
-						previous = h_adjascentTriangles[temp - 1];
-					}
-					else if (temp % 3 == 1)
-					{
-						next = h_adjascentTriangles[temp + 1];
-						previous = h_adjascentTriangles[temp - 1];
-					}
-					else
-					{
-						next = h_adjascentTriangles[temp + 1];
-						previous = h_adjascentTriangles[temp + 2];
-					}
+					next = h_adjascentTriangles[temp + 1];
+					previous = h_adjascentTriangles[temp - 1];
 				}
-				h_seedElements.push_back(temp);
-				count++;
+				else
+				{
+					next = h_adjascentTriangles[temp + 1];
+					previous = h_adjascentTriangles[temp + 2];
+				}
 			}
+			h_seedElements.push_back(temp);
+			begin += multiComponentPatchSize[i];
 
+			count++;
+		}
 	}
-
 }
 
 void preRxMeshDataStructure::clear()
 {
 	h_seedElements.clear();
 	h_adjascentTriangles.clear();
+	multiComponentPatchCount.clear();
+	multiComponentPatchSize.clear();
+}
+
+void preRxMeshDataStructure::clearSeedComponents()
+{
+	h_seedElements.clear();
+	multiComponentPatchSize.clear();
 }
 
 

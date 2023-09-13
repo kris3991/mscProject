@@ -150,6 +150,7 @@ int main(int argc, char** argv)
     bool showHalfEdgeQueryWindow = false;
     bool bfs = false;
     bool rxMeshStart = false;
+    bool rxMeshStartMultiComp = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
@@ -259,6 +260,7 @@ int main(int argc, char** argv)
                         he->initialiseEdges(tm);
                         he->fillAdjascencyList(tm);
                         rx->initialise(tm);
+                        rx->h_fillAdjascentTriangles(tm);
 
                         //he->initialise(tm);
 
@@ -283,7 +285,10 @@ int main(int argc, char** argv)
 
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_R)))
         {
-            rxMeshStart = true;
+            if (cm->componentCount == 1)
+                rxMeshStart = true;
+            else
+                rxMeshStartMultiComp = true;
         }
 
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_H)))
@@ -390,20 +395,21 @@ int main(int argc, char** argv)
             ImGui::SetNextWindowSize(size);
             ImGui::Begin("Create RxMesh", &rxMeshStart);
             int faceCount = tm->faceVector.size() / 3;
-            std::string limit = std::string("Enter a patch size less than ") + std::to_string(faceCount);
-            int patchSize = 0;
+           
+            std::string limit = std::string("The number of faces is: ") + std::to_string(faceCount);
+            limit + std::string("Enter the number of patches");
+            
 
             static char str[256] = {};
             if (limit.size())
             {
                 ImGui::Text(limit.c_str());
-                ImGui::InputText(":Patch Size", &str[0], IM_ARRAYSIZE(str));
+                ImGui::InputText(":Patch Count", &str[0], IM_ARRAYSIZE(str));
                 if (ImGui::Button("Create RxMesh")) {
                     std::string patchString = std::string(str);
-                    int patchSize = stoi(patchString);
+                    int patchCount = stoi(patchString);
                     {
-                        rx->h_fillAdjascentTriangles(tm);
-                        rx->h_initialiseSeedElements(tm, cm, patchSize);
+                        rx->h_initialiseSeedElements(tm, cm, patchCount);
                         rxMeshStart = false;
                     }
                 }
@@ -414,6 +420,53 @@ int main(int argc, char** argv)
             }
             ImGui::End();
         }
+
+        if (rxMeshStartMultiComp)
+        {
+            ImVec2 size = ImVec2(450, 150);
+            ImGui::SetNextWindowSize(size);
+            ImGui::Begin("Create RxMesh", &rxMeshStartMultiComp);
+            int faceCount = tm->faceVector.size() / 3;
+            std::string limit;
+            std::string componenentString = "The total number of components are: " + std::to_string(cm->componentCount);
+            ImGui::Text(componenentString.c_str());
+
+            std::string text;
+            for (int i = 0; i < cm->componentCount; i++)
+            {
+                text = std::string("The number of faces in component ") + std::to_string(i);
+                text = text + std::string(" ") + " is " + std::to_string(cm->componentLocation[i + 1] - cm->componentLocation[i]);
+                ImGui::Text(text.c_str());
+            }
+
+            std::string componenentString2 = "Enter the patch counts in a comma separated format";
+            ImGui::Text(componenentString2.c_str());
+
+            static char str[256] = {};
+            ImGui::InputText(":Patch Counts", &str[0], IM_ARRAYSIZE(str));
+            if (ImGui::Button("Create RxMesh")) {
+                std::string patchString = std::string(str);
+                std::istringstream stream(patchString);
+                std::string token;
+                rx->multiComponentPatchCount.clear();
+                while (std::getline(stream, token, ',')) {
+                    rx->multiComponentPatchCount.push_back(stoi(token));
+                }
+                if (rx->multiComponentPatchCount.size())
+                {
+                    rx->clearSeedComponents();
+                    rx->h_initialiseSeedElementsMultiComp(tm, cm);
+                }
+                rxMeshStartMultiComp = false;
+            }
+            if (ImGui::Button("Close"))
+            {
+                rxMeshStartMultiComp = false;
+            }
+            ImGui::End();
+        }
+
+
        
         // Rendering
         ImGui::Render();
