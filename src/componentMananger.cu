@@ -77,7 +77,8 @@ void ComponentManager::unionVertices(int v0, int v1)
             parentMap[pV1] = pV0;
             rankMap[pV0]++;
         }
-
+        
+       
 
 
     }
@@ -111,6 +112,32 @@ void ComponentManager::findComponents(TriangleMesh* tm)
     {
         parentVector[i] = parentMap[tm->faceVector[i]];
     }
+    //sometimes with blender files subdivision causes some issues.
+    //i am generating large face objects with subdivision,
+    //this is an extra check.
+    //each face has 3 vertices, in a face it is impossible to have vertices that have distinct parents, check that.
+    //faces belonging to the same group will be grouped together.
+    for (int i = 0; i < parentVector.size(); i = i+3)
+    {
+        int v0, v1, v2;
+        v0 = parentVector[i];
+        v1 = parentVector[i + 1];
+        v2 = parentVector[i + 2];
+        if (!(v0 == v1 && v1 == v2))
+        {
+            parentVector[i + 1] = parentVector[i];
+            parentVector[i + 2] = parentVector[i + 1];
+            //check with previous face just to be sure.
+            if (parentVector[i - 1] != parentVector[i])
+            {
+                parentVector[i] = parentVector[i - 1];
+                parentVector[i + 1] = parentVector[i];
+                parentVector[i + 2] = parentVector[i + 1];
+            }
+            
+        }
+    }
+
 
    //find where each component begins and ends.
     componentLocation.push_back(0);

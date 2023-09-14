@@ -410,6 +410,8 @@ int main(int argc, char** argv)
                     int patchCount = stoi(patchString);
                     {
                         rx->h_initialiseSeedElements(tm, cm, patchCount);
+                        rx->h_fillPatchingArrayWithSeedPoints();
+                        rx->h_populatePatches(tm);
                         rxMeshStart = false;
                     }
                 }

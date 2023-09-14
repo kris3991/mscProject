@@ -52,6 +52,8 @@ void preRxMeshDataStructure::freeCudaData()
 		cudaFree(d_adjascentTriangles);
 	if (d_sizeN != nullptr)
 		cudaFree(d_sizeN);
+	if (d_patchingArray != nullptr)
+		cudaFree(d_patchingArray);
 }
 
 preRxMeshDataStructure::~preRxMeshDataStructure()
@@ -66,6 +68,8 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 	numFaces = tm->faceVector.size() / 3;
 	int size_N = tm->faceVector.size();
 	h_faceIndexVector.resize(numFaces);
+	h_patchingArray.resize(numFaces);
+	std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
 	for (int i = 0; i < numFaces; ++i)
 	{
 		h_faceIndexVector[i] = i;
@@ -91,12 +95,20 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 	}
 	//end
 
+	//allocate patching array.
+	status = cudaMalloc(&d_patchingArray, sizeof(int) * numFaces);
+	if (status != cudaSuccess)
+	{
+		std::cout << "Patching allocation failed" << std::endl;
+	}
+
 	//memcpy
 	status = cudaMemcpy(d_faceVector, tm->faceVector.data(), sizeofFaceVector, cudaMemcpyHostToDevice);
 	if (status != cudaSuccess)
 	{
 		std::cout << "memcpy failed for d_faceVector" << std::endl;
 	}
+
 
 	//this is for cudaAtomic operations.
 
@@ -161,7 +173,13 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 		}
 			
 	}
-
+	//allocate seed array.
+	cudaError status = cudaMalloc(&d_seedArray, sizeof(int) * h_seedElements.size());
+	if (status != cudaSuccess)
+	{
+		std::cout << "allocation error for d_seedArray" << std::endl;
+	}
+	cudaMemcpy(d_seedArray, h_seedElements.data(), sizeof(int)* h_seedElements.size(), cudaMemcpyHostToDevice);
 }
 
 void preRxMeshDataStructure::h_initialiseSeedElementsMultiComp(TriangleMesh* tm, ComponentManager* cm)
@@ -275,3 +293,143 @@ void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int 
 
 	}
 }
+
+__global__
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles)
+{
+	int tId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tId < size_N)
+	{
+		int t0, t1, t2;
+		if (d_patchingArray[tId] != -1)
+		{
+			int patch = tId;
+			t0 = d_adjascentTriangles[3 * tId];
+			t1 = d_adjascentTriangles[3 * tId + 1];
+			t2 = d_adjascentTriangles[3 * tId + 2];
+			if (t0 != -1)
+			{
+				atomicCAS(d_patchingArray + t0, -1, blockIdx.x);
+			}
+			if (t1 != -1)
+			{
+				atomicCAS(d_patchingArray + t1, -1, blockIdx.x);
+			}
+			if (t2 != -1)
+			{
+				atomicCAS(d_patchingArray + t2, -1, blockIdx.x);
+			}
+			
+		}
+	}
+}
+
+//__global__ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_count, bool* d_continue) {
+//	int tId = blockIdx.x * blockDim.x + threadIdx.x;
+//
+//	while (*d_continue) {
+//		if (tId < size_N) {
+//			int t0, t1, t2;
+//
+//			if (d_patchingArray[tId] != -1) 
+//			{
+//				t0 = d_adjascentTriangles[3 * tId];
+//				t1 = d_adjascentTriangles[3 * tId + 1];
+//				t2 = d_adjascentTriangles[3 * tId + 2];
+//
+//				if (t0 != -1 && d_patchingArray[t0] == -1) {
+//					d_patchingArray[t0] = t0;
+//					*d_continue = true;
+//				}
+//				if (t1 != -1 && d_patchingArray[t1] == -1) {
+//					d_patchingArray[t1] = t1;
+//					*d_continue = true;
+//				}
+//				if (t2 != -1 && d_patchingArray[t2] == -1) {
+//					d_patchingArray[t2] = t2;
+//					*d_continue = true;
+//				}
+//			}
+//		}
+//		__syncthreads();
+//
+//		if (tId == 0) {
+//			*d_continue = false;
+//		}
+//		__syncthreads();
+//	}
+//}
+
+
+
+__global__
+void d_counter(int* d_patchingArray, int size_N, int* d_count)
+{
+	int tId = blockIdx.x * blockDim.x + threadIdx.x;
+	*d_count = 0;
+	if (tId < size_N)
+	{
+		if (d_patchingArray[tId] == -1)
+			atomicAdd(d_count, 1);
+	}
+}
+
+void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
+{
+	//there is no point in parallelising this block.
+	//and will only be done once.
+	for (int i = 0; i < h_seedElements.size(); ++i)
+	{
+		int currFace = h_seedElements[i];
+		h_patchingArray[currFace] = i;
+	}
+
+	cudaError status = cudaMemcpy(d_patchingArray, h_patchingArray.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
+	if (status != cudaSuccess)
+	{
+		std::cout << "memcpy failed for d_patchingArray" << std::endl;
+	}
+
+}
+
+void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm)
+{
+	int threadCount = patchSize;
+	int blockCount = patchCount;
+	int size_N = tm->faceVector.size()/3;
+	int sharedMemorySize = threadCount * sizeof(int);
+	//set any random non zero value.
+	int count = 0;
+	int* d_count = 0;
+	cudaMalloc(&d_count, sizeof(int));
+	cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
+	//i was using blelloch earlier to get the sum of all face values.
+	//buts its easier to check for the number of -1s in the patching array
+	/*for (int i = 0; i < 3; ++i)*/
+	do
+	{
+		cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
+		d_populatePatchingArray << <blockCount, threadCount >> > (d_patchingArray, size_N, d_adjascentTriangles);
+		cudaDeviceSynchronize();
+		d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
+		cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
+	} while (count != 0);
+		
+		/*d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
+		cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);*/
+	//cudaDeviceSynchronize
+	cudaMemcpy(h_patchingArray.data(), d_patchingArray, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+	//test.
+	std::vector<int> test;
+	test.resize(h_seedElements.size());
+	for (int i = 0; i < h_patchingArray.size(); ++i)
+	{
+		if (h_patchingArray[i] != -1)
+			test[h_patchingArray[i]]++;
+	}
+	cudaFree(d_count);
+
+}
+
+
+

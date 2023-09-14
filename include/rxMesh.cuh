@@ -11,6 +11,7 @@
 
 #include "../include/test.cuh"
 #include <random>
+#include <stdio.h>
 
 
 
@@ -34,12 +35,16 @@ public:
 	//for multi component meshes.
 	std::vector<int> multiComponentPatchCount;
 	std::vector<int> multiComponentPatchSize;
+	std::vector<int> h_patchingArray;
+
 	//cuda pointers.
 
 	int* d_adjascentTriangles;
 	int* d_faceVector;
 	int* d_triangleAdjascencyVector;
 	int* d_sizeN;
+	int* d_patchingArray;
+	int* d_seedArray;
 	//
 	int patchSize;
 	int patchCount;
@@ -49,9 +54,13 @@ public:
 	void h_initialiseSeedElementsMultiComp(TriangleMesh* tm, ComponentManager* cm);
 	void initialise(TriangleMesh* tm);
 
+	void h_fillPatchingArrayWithSeedPoints();
+
+	void h_populatePatches(TriangleMesh* tm);
+
 	//all the host functions that call gpu functions will have h_ tag
 	void h_fillAdjascentTriangles(TriangleMesh* tm);
-	//
+	//fill patching array.
 	~preRxMeshDataStructure();
 	void freeCudaData();
 
@@ -61,6 +70,16 @@ public:
 
 };
 
-
+//cuda functions.
 __global__
 void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int size_N);
+
+__global__
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles);
+
+//__global__
+//void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_count, bool* d_continue);
+
+
+__global__
+void d_counter(int* d_patchingArray, int size_N, int* d_count);
