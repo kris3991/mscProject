@@ -36,6 +36,7 @@ public:
 	std::vector<int> multiComponentPatchCount;
 	std::vector<int> multiComponentPatchSize;
 	std::vector<int> h_patchingArray;
+	std::map<int, std::vector<int>> h_adjTriMap;
 
 	//cuda pointers.
 
@@ -45,6 +46,7 @@ public:
 	int* d_sizeN;
 	int* d_patchingArray;
 	int* d_seedArray;
+	int* d_boundaryElements;
 	//
 	int patchSize;
 	int patchCount;

@@ -96,6 +96,13 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 		std::cout << "Patching allocation failed" << std::endl;
 	}
 
+	status = cudaMalloc(&d_boundaryElements, sizeof(int) * numFaces);
+	if (status != cudaSuccess)
+	{
+		std::cout << "Patching allocation failed" << std::endl;
+	}
+
+
 	//memcpy
 	status = cudaMemcpy(d_faceVector, tm->faceVector.data(), sizeofFaceVector, cudaMemcpyHostToDevice);
 	if (status != cudaSuccess)
@@ -140,25 +147,13 @@ void preRxMeshDataStructure::h_initialiseSeedElements(TriangleMesh* tm, Componen
 			if (end > numFaces)
 				end = numFaces;
 
-			int next{ -1 }, previous{ -1 };
-			while (next == -1 && previous == -1)
+			int t0{-1}, t1{ -1 }, t2{ -1 };
+			while (t0 == -1 && t1 == -1 && t2 == -1)
 			{
 				temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end - 1);
-				if (temp % 3 == 2)
-				{
-					next = h_adjascentTriangles[temp - 2];
-					previous = h_adjascentTriangles[temp - 1];
-				}
-				else if (temp % 3 == 1)
-				{
-					next = h_adjascentTriangles[temp + 1];
-					previous = h_adjascentTriangles[temp - 1];
-				}
-				else
-				{
-					next = h_adjascentTriangles[temp + 1];
-					previous = h_adjascentTriangles[temp + 2];
-				}
+				t0 = h_adjTriMap[temp][0];
+				t1 = h_adjTriMap[temp][2];
+				t2 = h_adjTriMap[temp][2];
 			}
 			h_seedElements.push_back(temp);
 			begin += patchSize;
@@ -196,25 +191,13 @@ void preRxMeshDataStructure::h_initialiseSeedElementsMultiComp(TriangleMesh* tm,
 			if (end > numFaces)
 				end = numFaces;
 
-			int next{ -1 }, previous{ -1 };
-			while (next == -1 && previous == -1)
+			int t0{ -1 }, t1{ -1 }, t2{-1};
+			while (t0 == -1 && t1 == -1 && t2 == -1)
 			{
 				temp = *select_randomly(h_faceIndexVector.begin() + begin, h_faceIndexVector.begin() + end - 1);
-				if (temp % 3 == 2)
-				{
-					next = h_adjascentTriangles[temp - 2];
-					previous = h_adjascentTriangles[temp - 1];
-				}
-				else if (temp % 3 == 1)
-				{
-					next = h_adjascentTriangles[temp + 1];
-					previous = h_adjascentTriangles[temp - 1];
-				}
-				else
-				{
-					next = h_adjascentTriangles[temp + 1];
-					previous = h_adjascentTriangles[temp + 2];
-				}
+				t0 = h_adjTriMap[temp][0];
+				t1 = h_adjTriMap[temp][2];
+				t2 = h_adjTriMap[temp][2];
 			}
 			h_seedElements.push_back(temp);
 			begin += multiComponentPatchSize[i];
@@ -230,6 +213,7 @@ void preRxMeshDataStructure::clear()
 	h_adjascentTriangles.clear();
 	multiComponentPatchCount.clear();
 	multiComponentPatchSize.clear();
+	h_adjTriMap.clear();
 }
 
 void preRxMeshDataStructure::clearSeedComponents(TriangleMesh* tm)
@@ -258,6 +242,11 @@ void preRxMeshDataStructure::h_fillAdjascentTriangles(TriangleMesh* tm)
 	//copy the data for later operations.
 	cudaMemcpy(h_adjascentTriangles.data(), d_adjascentTriangles, sizeofFaceVector, cudaMemcpyDeviceToHost);
 
+	//fill hash map for faster access.
+	for (int i = 0; i < h_adjascentTriangles.size(); i = i + 3)
+	{
+		h_adjTriMap[i / 3] = { h_adjascentTriangles[i], h_adjascentTriangles[i + 1], h_adjascentTriangles[i + 2] };
+	}
 }
 
 __global__
@@ -265,7 +254,8 @@ void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int 
 {
 	int tId = blockDim.x * blockIdx.x + threadIdx.x;
 	int lId = threadIdx.x;
-	
+	//basic modulo operation for triangles.
+
 	if (tId < size_N)
 	{
 		int v0 = d_faceVector[tId];
@@ -297,6 +287,12 @@ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentT
 	int tId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tId < size_N)
 	{
+		//the idea is to check for the faces who have adjascent elements in a different patch.
+		//store that in boundary.
+		//populate based on adj triangles. so no invalid triangle pops up in the patch.
+		int begin = blockIdx.x * blockDim.x;
+		int end = blockIdx.x* blockDim.x + blockDim.x;
+
 		int t0, t1, t2;
 		if (d_patchingArray[tId] != -1)
 		{
@@ -304,17 +300,26 @@ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentT
 			t0 = d_adjascentTriangles[3 * tId];
 			t1 = d_adjascentTriangles[3 * tId + 1];
 			t2 = d_adjascentTriangles[3 * tId + 2];
-			if (t0 != -1)
+			if (t0 != -1 && atomicCAS(d_patchingArray + t0, -1, blockIdx.x))
 			{
-				atomicCAS(d_patchingArray + t0, -1, blockIdx.x);
+				if (t0 > end || t0 < begin)
+				{
+					printf("%d is a boundary \n", tId);
+				}
 			}
-			if (t1 != -1)
+			if (t1 != -1 && atomicCAS(d_patchingArray + t1, -1, blockIdx.x))
 			{
-				atomicCAS(d_patchingArray + t1, -1, blockIdx.x);
+				if (t1 > end || t1 < begin)
+				{
+					printf("%d is a boundary \n", tId);
+				}
 			}
-			if (t2 != -1)
+			if (t2 != -1 && atomicCAS(d_patchingArray + t2, -1, blockIdx.x))
 			{
-				atomicCAS(d_patchingArray + t2, -1, blockIdx.x);
+				if (t2 > end || t2 < begin)
+				{
+					printf("%d is a boundary \n", tId);
+				}
 			}
 			
 		}
@@ -382,6 +387,14 @@ void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
 	}
 
 	cudaError status = cudaMemcpy(d_patchingArray, h_patchingArray.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
+	if (status != cudaSuccess)
+	{
+		std::cout << "memcpy failed for d_patchingArray" << std::endl;
+	}
+
+	//fill -1 for boundary just in case.
+	std::vector<int> tempVec(h_patchingArray.size(), -1);
+	status = cudaMemcpy(d_boundaryElements, tempVec.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
 	if (status != cudaSuccess)
 	{
 		std::cout << "memcpy failed for d_patchingArray" << std::endl;
