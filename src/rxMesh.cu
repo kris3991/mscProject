@@ -88,12 +88,6 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 	{
 		std::cout << "error allocating d_faceVector" << std::endl;
 	}
-	status = cudaMalloc(&d_adjascentTriangles, sizeofFaceVector);
-	if (status != cudaSuccess)
-	{
-		std::cout << "error allocating d_adjascentTriangles" << std::endl;
-	}
-	//end
 
 	//allocate patching array.
 	status = cudaMalloc(&d_patchingArray, sizeof(int) * numFaces);
@@ -238,10 +232,13 @@ void preRxMeshDataStructure::clear()
 	multiComponentPatchSize.clear();
 }
 
-void preRxMeshDataStructure::clearSeedComponents()
+void preRxMeshDataStructure::clearSeedComponents(TriangleMesh* tm)
 {
 	h_seedElements.clear();
 	multiComponentPatchSize.clear();
+	int size_N = tm->faceVector.size() / 3;
+	h_patchingArray.resize(size_N);
+	std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
 }
 
 
@@ -424,8 +421,7 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm)
 	test.resize(h_seedElements.size());
 	for (int i = 0; i < h_patchingArray.size(); ++i)
 	{
-		if (h_patchingArray[i] != -1)
-			test[h_patchingArray[i]]++;
+		test[h_patchingArray[i]]++;
 	}
 	cudaFree(d_count);
 

@@ -409,6 +409,7 @@ int main(int argc, char** argv)
                     std::string patchString = std::string(str);
                     int patchCount = stoi(patchString);
                     {
+                        rx->clearSeedComponents(tm);
                         rx->h_initialiseSeedElements(tm, cm, patchCount);
                         rx->h_fillPatchingArrayWithSeedPoints();
                         rx->h_populatePatches(tm);
@@ -456,7 +457,7 @@ int main(int argc, char** argv)
                 }
                 if (rx->multiComponentPatchCount.size())
                 {
-                    rx->clearSeedComponents();
+                    rx->clearSeedComponents(tm);
                     rx->h_initialiseSeedElementsMultiComp(tm, cm);
                 }
                 rxMeshStartMultiComp = false;

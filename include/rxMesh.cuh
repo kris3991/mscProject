@@ -65,7 +65,7 @@ public:
 	void freeCudaData();
 
 	void clear();
-	void clearSeedComponents();
+	void clearSeedComponents(TriangleMesh* tm);
 
 
 };
