@@ -405,17 +405,15 @@ int main(int argc, char** argv)
             {
                 ImGui::Text(limit.c_str());
                 ImGui::InputText(":Patch Count", &str[0], IM_ARRAYSIZE(str));
-                if (ImGui::Button("Create RxMesh")) {
-                    std::string patchString = std::string(str);
-                    int patchCount = stoi(patchString);
-                    {
-                        rx->clearSeedComponents(tm);
-                        rx->h_initialiseSeedElements(tm, cm, patchCount);
-                        rx->h_fillPatchingArrayWithSeedPoints();
-                        rx->h_populatePatches(tm);
-                        rxMeshStart = false;
-                    }
-                }
+				if (ImGui::Button("Create RxMesh")) {
+					std::string patchString = std::string(str);
+					int patchCount = stoi(patchString);
+
+					//patching algorithm.
+					rx->h_populatePatches(tm, true, cm, patchCount);
+					rxMeshStart = false;
+
+				}
             }
             if (ImGui::Button("Close"))
             {

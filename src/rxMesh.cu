@@ -54,6 +54,8 @@ void preRxMeshDataStructure::freeCudaData()
 		cudaFree(d_sizeN);
 	if (d_patchingArray != nullptr)
 		cudaFree(d_patchingArray);
+	if (d_boundaryElements != nullptr)
+		cudaFree(d_boundaryElements);
 }
 
 preRxMeshDataStructure::~preRxMeshDataStructure()
@@ -70,6 +72,12 @@ void preRxMeshDataStructure::initialise(TriangleMesh* tm)
 	h_faceIndexVector.resize(numFaces);
 	h_patchingArray.resize(numFaces);
 	std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
+
+
+
+	h_boundaryElements.resize(numFaces);
+	std::fill(h_boundaryElements.begin(), h_boundaryElements.end(), 0);
+
 	for (int i = 0; i < numFaces; ++i)
 	{
 		h_faceIndexVector[i] = i;
@@ -282,7 +290,7 @@ void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int 
 }
 
 __global__
-void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles)
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_boundaryElements)
 {
 	int tId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tId < size_N)
@@ -290,6 +298,7 @@ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentT
 		//the idea is to check for the faces who have adjascent elements in a different patch.
 		//store that in boundary.
 		//populate based on adj triangles. so no invalid triangle pops up in the patch.
+		//thread divergence better than o(n3)
 		int begin = blockIdx.x * blockDim.x;
 		int end = blockIdx.x* blockDim.x + blockDim.x;
 
@@ -298,30 +307,39 @@ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentT
 		{
 			int patch = tId;
 			t0 = d_adjascentTriangles[3 * tId];
+			if (t0 > end || t0 < begin)
+			{
+				atomicCAS(d_boundaryElements + patch, 0, 1);
+			}
+
 			t1 = d_adjascentTriangles[3 * tId + 1];
+
+			if (t1 > end || t1 < begin)
+			{
+				atomicCAS(d_boundaryElements + patch, 0, 1);
+			}
+
+
 			t2 = d_adjascentTriangles[3 * tId + 2];
+
+			if (t2 > end || t2 < begin)
+			{
+				atomicCAS(d_boundaryElements + patch, 0, 1);
+			}
+
+
 			if (t0 != -1 && atomicCAS(d_patchingArray + t0, -1, blockIdx.x))
 			{
-				if (t0 > end || t0 < begin)
-				{
-					printf("%d is a boundary \n", tId);
-				}
+				
 			}
 			if (t1 != -1 && atomicCAS(d_patchingArray + t1, -1, blockIdx.x))
 			{
-				if (t1 > end || t1 < begin)
-				{
-					printf("%d is a boundary \n", tId);
-				}
+				
 			}
 			if (t2 != -1 && atomicCAS(d_patchingArray + t2, -1, blockIdx.x))
 			{
-				if (t2 > end || t2 < begin)
-				{
-					printf("%d is a boundary \n", tId);
-				}
+				
 			}
-			
 		}
 	}
 }
@@ -392,9 +410,8 @@ void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
 		std::cout << "memcpy failed for d_patchingArray" << std::endl;
 	}
 
-	//fill -1 for boundary just in case.
-	std::vector<int> tempVec(h_patchingArray.size(), -1);
-	status = cudaMemcpy(d_boundaryElements, tempVec.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
+	//fill 0 for boundary just in case.
+	status = cudaMemcpy(d_boundaryElements, h_boundaryElements.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
 	if (status != cudaSuccess)
 	{
 		std::cout << "memcpy failed for d_patchingArray" << std::endl;
@@ -402,41 +419,96 @@ void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
 
 }
 
-void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm)
+void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIterations, ComponentManager* cm, int pc)
 {
-	int threadCount = patchSize;
-	int blockCount = patchCount;
-	int size_N = tm->faceVector.size()/3;
-	int sharedMemorySize = threadCount * sizeof(int);
-	//set any random non zero value.
-	int count = 0;
-	int* d_count = 0;
-	cudaMalloc(&d_count, sizeof(int));
-	cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
-	//i was using blelloch earlier to get the sum of all face values.
-	//buts its easier to check for the number of -1s in the patching array
-	/*for (int i = 0; i < 3; ++i)*/
-	do
-	{
+
+	//the algorithm involvest the following steps
+	//initialise seed elements.
+	//copy seed elements to patching array
+	//for every non -1 element in patching array, add its neighbours.
+	//keep counter to keep track of the patching process.
+	//check if the faces are boundary. Select non boundary faces as seed for next itertaion.
+	//repeat until 5th loop if iteration is enabled. 
+
+	
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
+
+	clearSeedComponents(tm);
+	h_initialiseSeedElements(tm, cm, pc);
+
+	// i am putting 5 loops as convergence max.
+	
+	int loopCounter = 5;
+	
+	do{
+		h_fillPatchingArrayWithSeedPoints();
+		//clear the gpu values 
+		cudaMemset(d_patchingArray, -1, tm->faceVector.size()/3);
+		cudaMemset(d_boundaryElements, 0, tm->faceVector.size() / 3);
+
+		int threadCount = patchSize;
+		int blockCount = patchCount;
+		int size_N = tm->faceVector.size() / 3;
+		int sharedMemorySize = threadCount * sizeof(int);
+		//set any random non zero value.
+		int count = 0;
+		int* d_count = 0;
+		cudaMalloc(&d_count, sizeof(int));
 		cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
-		d_populatePatchingArray << <blockCount, threadCount >> > (d_patchingArray, size_N, d_adjascentTriangles);
-		cudaDeviceSynchronize();
-		d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
-		cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
-	} while (count != 0);
+		//i was using blelloch earlier to get the sum of all face values.
+		//buts its easier to check for the number of -1s in the patching array
+		/*for (int i = 0; i < 3; ++i)*/
+		do
+		{
+			cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
+			d_populatePatchingArray << <blockCount, threadCount >> > (d_patchingArray, size_N, d_adjascentTriangles, d_boundaryElements);
+			cudaDeviceSynchronize();
+			d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
+			cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
+		} while (count != 0);
+
 		
-		/*d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
-		cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);*/
-	//cudaDeviceSynchronize
-	cudaMemcpy(h_patchingArray.data(), d_patchingArray, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
-	//test.
-	std::vector<int> test;
-	test.resize(h_seedElements.size());
-	for (int i = 0; i < h_patchingArray.size(); ++i)
-	{
-		test[h_patchingArray[i]]++;
-	}
-	cudaFree(d_count);
+		cudaMemcpy(h_boundaryElements.data(), d_boundaryElements, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+
+		//in the next iteration choose a seed point that is not a boundary element.
+		//since i have chosen seed points which are not really boundary the following step could be possibly be skipped for more performance.
+		//adding a condition to skip this.
+		h_seedElements.clear();
+		if (doIterations)
+		{
+			//nothing to parallelise here.
+			for (int i = 0; i < patchCount; ++i)
+			{
+				int random_number;
+				int begin = i * patchSize;
+				int end = (i + 1) * patchSize;
+				std::uniform_int_distribution<> distr(begin, end);
+				int val = 1;
+				//this loop will almost always be 1,for example in a patch(size 180) of a sphere obj of 960 faces, 10 are boundary around 0.02 percent in each patch.
+				//while worst case is o(n3) here this will generally be o(1).
+				while (val)
+				{
+					random_number = distr(gen);
+					val = h_boundaryElements[random_number];
+				}
+				h_seedElements.push_back(random_number);
+			}
+			loopCounter--;
+		}
+		else
+		{
+			loopCounter = 0;
+		}
+		cudaFree(d_count);
+		//clear all the cpu arrays.
+		std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
+		std::fill(h_boundaryElements.begin(), h_boundaryElements.end(), 0);
+	
+
+
+	}while (loopCounter);
 
 }
 

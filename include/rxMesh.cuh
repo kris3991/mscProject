@@ -37,6 +37,7 @@ public:
 	std::vector<int> multiComponentPatchSize;
 	std::vector<int> h_patchingArray;
 	std::map<int, std::vector<int>> h_adjTriMap;
+	std::vector<int> h_boundaryElements;
 
 	//cuda pointers.
 
@@ -58,7 +59,7 @@ public:
 
 	void h_fillPatchingArrayWithSeedPoints();
 
-	void h_populatePatches(TriangleMesh* tm);
+	void h_populatePatches(TriangleMesh* tm, bool doIterations, ComponentManager* cm, int pc);
 
 	//all the host functions that call gpu functions will have h_ tag
 	void h_fillAdjascentTriangles(TriangleMesh* tm);
@@ -77,7 +78,7 @@ __global__
 void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int size_N);
 
 __global__
-void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles);
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_boundaryElements);
 
 //__global__
 //void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_count, bool* d_continue);
