@@ -44,6 +44,7 @@ public:
 	void readObjFile(const std::string filePath, TriangleMesh* tm);
 	const char* launchFileReader();
 	void writeNormals(TriangleMesh* tm, std::chrono::duration<double> delta);
+	void writeNormals(TriangleMesh* tm, float delta);
 	void writeBFSdata(TriangleMesh* tm, std::map<int, int> &geodesicDistances, std::chrono::duration<double> geodesicProcessingTime,
 	std::chrono::duration<double> geodesicCalcTime, int source);
 };

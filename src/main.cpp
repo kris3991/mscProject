@@ -111,6 +111,13 @@ int main(int argc, char** argv)
         std::cout << "RxMesh structure initialisation failed" << std::endl;
         return 0;
     }
+
+    RxMesh* rMesh = RxMesh::GetInstance();
+    if (rMesh == nullptr)
+    {
+        std::cout << "RxMesh object initialisation failed" << std::endl;
+        return 0;
+    }
     
     window = glfwCreateWindow(1000, 800, "MSc Project", nullptr, nullptr);
     
@@ -303,6 +310,22 @@ int main(int argc, char** argv)
             }
         }
 
+        if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_I)))
+        {
+            if (!tm->vertices.size())
+            {
+                std::cout << "invalid data" << std::endl;
+            }
+            else if (!rMesh->vertices.size())
+            {
+                std::cout << "RxMesh not initialised" << std::endl;
+            }
+            else
+            {
+                rMesh->calculateNormals(fm, tm);
+            }
+        }
+
         if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_O)))
         {
             if (!tm->vertices.size())
@@ -411,7 +434,10 @@ int main(int argc, char** argv)
 
 					//patching algorithm.
 					rx->h_populatePatches(tm, true, cm, patchCount);
-                    rx->addRibbons(tm);
+                    
+                    rx->addRibbons(tm, rMesh);
+                    rx->fillVertices(rMesh, tm);
+
 					rxMeshStart = false;
 
 				}
@@ -456,8 +482,14 @@ int main(int argc, char** argv)
                 }
                 if (rx->multiComponentPatchCount.size())
                 {
-                    rx->clearSeedComponents(tm);
-                    rx->h_initialiseSeedElementsMultiComp(tm, cm);
+                    //patching algorithm.
+                    rx->patchCount = std::reduce(rx->multiComponentPatchCount.begin(), rx->multiComponentPatchCount.end());
+                    rx->h_populatePatches(tm, true, cm, rx->patchCount);
+
+                    rx->addRibbons(tm, rMesh);
+                    rx->fillVertices(rMesh, tm);
+
+                    rxMeshStart = false;
                 }
                 rxMeshStartMultiComp = false;
             }
@@ -487,6 +519,7 @@ int main(int argc, char** argv)
 
     //cuda cleanup
     rx->freeCudaData();
+    rMesh->clearCudaData();
 
 
     // Cleanup

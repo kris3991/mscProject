@@ -17,6 +17,85 @@ Iter select_randomly(Iter start, Iter end) {
 	return select_randomly(start, end, gen);
 }
 
+
+//patches
+void Patch::fillRibbons(preRxMeshDataStructure* rm)
+{
+	int t0{ 0 }, t1{ 0 }, t2{0};
+	for (int i = 0; i < boundaryElements.size(); ++i)
+	{
+		t0 = rm->h_adjTriMap[boundaryElements[i]][0];
+		t1 = rm->h_adjTriMap[boundaryElements[i]][1];
+		t2 = rm->h_adjTriMap[boundaryElements[i]][2];
+		ribbonElements.insert(t0);
+		ribbonElements.insert(t1);
+		ribbonElements.insert(t2);
+	}
+}
+
+//RxMesh
+RxMesh* RxMesh::rxMesh = nullptr;
+RxMesh* RxMesh::GetInstance()
+{
+	if (rxMesh == nullptr) {
+		rxMesh = new RxMesh();
+	}
+	return rxMesh;
+}
+
+RxMesh::RxMesh()
+{
+
+}
+
+
+void RxMesh::calculateNormals(FileManager* fm, TriangleMesh* tm)
+{
+	//face data structure is 12 bytes of data.
+	//8*3 + 12*3 =36 bytes of data.
+	//i set shared memory size as 2 * 64 * 36 bytes.
+
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
+	int threadCount = 2 << 6;
+	int totalSize = faces.size();
+	int blockCount = (totalSize + threadCount - 1) / threadCount;
+	int normalCount = normals.size();
+	cudaEventRecord(start);
+	d_calculateNormals << <blockCount, threadCount >> > (d_faces, totalSize, d_normals, normalCount);
+	cudaMemcpy(normals.data(), d_normals, sizeof(Vertex) * normals.size(), cudaMemcpyDeviceToHost);
+	cudaEventRecord(stop);
+	cudaEventSynchronize(stop);
+
+	float delta = 0;
+	cudaEventElapsedTime(&delta, start, stop);
+	cudaEventDestroy(start);
+	cudaEventDestroy(stop);
+
+	delta = delta * 1000;
+	for (int i = 0; i < normals.size(); ++i)
+	{
+		tm->normals[i].x = normals[i].vx;
+		tm->normals[i].y = normals[i].vy;
+		tm->normals[i].z = normals[i].vz;
+	}
+	
+	fm->writeNormals(tm, delta);
+
+
+}
+
+
+void RxMesh::clearCudaData()
+{
+	if(d_faces != nullptr)
+		cudaFree(d_faces);
+	if (d_normals != nullptr)
+		cudaFree(d_normals);
+}
+
 preRxMeshDataStructure* preRxMeshDataStructure::rxMeshStruct = nullptr;
 
 
@@ -185,7 +264,8 @@ void preRxMeshDataStructure::h_initialiseSeedElementsMultiComp(TriangleMesh* tm,
 {
 	multiComponentPatchSize.clear();
 	multiComponentPatchSize.resize(cm->componentCount);
-	
+	//for global patchSize
+	patchSize = (numFaces + patchCount - 1) / patchCount;
 	for (int i = 0; i < cm->componentCount; ++i)
 	{
 		int count{ 0 };
@@ -381,7 +461,15 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 
 
 	clearSeedComponents(tm);
-	h_initialiseSeedElements(tm, cm, pc);
+	if (cm->componentCount == 1)
+	{
+		h_initialiseSeedElements(tm, cm, pc);
+	}
+	else
+	{
+		h_initialiseSeedElementsMultiComp(tm, cm);
+	}
+	
 	h_tempPatchArray.resize(h_patchingArray.size());
 	std::fill(h_tempPatchArray.begin(), h_tempPatchArray.end(), -1);
 
@@ -422,7 +510,7 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 		cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
 		//i was using blelloch earlier to get the sum of all face values.
 		//but the reference in nvidea is for a single block.
-		/*for (int i = 0; i < 3; ++i)*/
+		//my own code was not working.
 
 		
 		do
@@ -477,25 +565,33 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 				begin = i * patchSize;
 				end = i * patchSize + patchSize;
 
-				int t0{ -1 }, t1{ -1 }, t2{ -1 };
-				bool breakLoop = false;
-				//safety.
-				int count = 50;
-				while (count && !breakLoop)
+				if (cm->componentCount == 1)
 				{
-
-					temp = *select_randomly(h_newPatchingArray.begin() + begin, h_newPatchingArray.begin() + end - 1);
-					t0 = h_adjTriMap[temp][0];
-					t1 = h_adjTriMap[temp][1];
-					t2 = h_adjTriMap[temp][2];
-
-					if (h_tempPatchArray[t0] == i && h_tempPatchArray[t1] == i && h_tempPatchArray[t2] == i)
+					int t0{ -1 }, t1{ -1 }, t2{ -1 };
+					bool breakLoop = false;
+					//safety.
+					int count = 50;
+					while (count && !breakLoop)
 					{
-						breakLoop = true;
+
+						temp = *select_randomly(h_newPatchingArray.begin() + begin, h_newPatchingArray.begin() + end - 1);
+						t0 = h_adjTriMap[temp][0];
+						t1 = h_adjTriMap[temp][1];
+						t2 = h_adjTriMap[temp][2];
+
+						if (h_tempPatchArray[t0] == i && h_tempPatchArray[t1] == i && h_tempPatchArray[t2] == i)
+						{
+							breakLoop = true;
+						}
+						count--;
 					}
-					count--;
+					h_seedElements.push_back(temp);
 				}
-				h_seedElements.push_back(temp);
+				else
+				{
+					h_initialiseSeedElementsMultiComp(tm, cm);
+				}
+
 			}
 		}
 		
@@ -515,8 +611,59 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 	
 }
 
+void preRxMeshDataStructure::fillVertices(RxMesh* rMesh, TriangleMesh* tm)
+{
+	for (int i = 0; i < tm->vertices.size(); ++i)
+	{
+		Vertex v;
+		v.vx = tm->vertices[i].x;
+		v.vy = tm->vertices[i].y;
+		v.vz = tm->vertices[i].z;
+		rMesh->vertices.push_back(v);
+	}
+	//to fit in the shared memory without global fetch.
+	for (int i = 0; i < tm->faceVector.size(); i += 3)
+	{
+		Faces f;
+		f.v0 = tm->faceVector[i];
+		f.v1 = tm->faceVector[i + 1];
+		f.v2 = tm->faceVector[i + 2];
 
-void preRxMeshDataStructure::addRibbons(TriangleMesh* tm)
+		f.v0PosX = rMesh->vertices[f.v0].vx;
+		f.v0PosY = rMesh->vertices[f.v0].vy;
+		f.v0PosZ = rMesh->vertices[f.v0].vz;
+
+		f.v1PosX = rMesh->vertices[f.v1].vx;
+		f.v1PosY = rMesh->vertices[f.v1].vy;
+		f.v1PosZ = rMesh->vertices[f.v1].vz;
+
+		f.v2PosX = rMesh->vertices[f.v2].vx;
+		f.v2PosY = rMesh->vertices[f.v2].vy;
+		f.v2PosZ = rMesh->vertices[f.v2].vz;
+		rMesh->faces.push_back(f);
+	}
+
+	for (int i = 0; i < tm->normals.size(); ++i)
+	{
+		Vertex vn;
+		vn.vx = tm->normals[i].x;
+		vn.vy = tm->normals[i].y;
+		vn.vz = tm->normals[i].z;
+		rMesh->normals.push_back(vn);
+	}
+
+	int sizeofFace = sizeof(Faces);
+	//faces.
+	cudaMalloc(&rMesh->d_faces, sizeofFace * rMesh->faces.size());
+	cudaMemcpy(rMesh->d_faces, rMesh->faces.data(), sizeofFace * rMesh->faces.size(), cudaMemcpyHostToDevice);
+	//normals.
+	cudaMalloc(&rMesh->d_normals, sizeof(Vertex) * rMesh->normals.size());
+	cudaMemcpy(rMesh->d_normals, rMesh->normals.data(), sizeof(Vertex) * rMesh->normals.size(), cudaMemcpyHostToDevice);
+
+}
+
+
+void preRxMeshDataStructure::addRibbons(TriangleMesh* tm, RxMesh* rMesh)
 {
 	int size_N = tm->faceVector.size() / 3;
 	
@@ -533,7 +680,30 @@ void preRxMeshDataStructure::addRibbons(TriangleMesh* tm)
 	d_findBoundaryPoints << <blockCount, threadCount >> > (d_patchingArray, size_N, d_boundaryElements, d_adjascentTriangles, d_patchPositions);
 	cudaMemcpy(h_boundaryElements.data(), d_boundaryElements, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
 
-	int a = 30;
+	rMesh->patchCount = patchCount;
+	rMesh->patchSize = patchSize;
+	rMesh->patches.resize(patchCount);
+
+	int begin{ 0 }, end{ 0 }, patch{0};
+	for (int i = 0; i < h_patchingArray.size(); ++i)
+	{
+		patch = (i / patchSize);
+		begin = patch * patchSize;
+		end = begin + patchSize;
+		rMesh->patches[patch].faces.push_back(h_patchingArray[i]);
+		if (h_boundaryElements[i] != -1)
+		{
+			rMesh->patches[h_boundaryElements[i]].boundaryElements.push_back(i);
+		}
+	}
+
+	
+	//for each patch add ribbon.
+	for (int i = 0; i < rMesh->patches.size(); ++i)
+	{
+		rMesh->patches[i].fillRibbons(this);
+	}
+
 }
 
 
@@ -582,3 +752,57 @@ void d_findBoundaryPoints(int* d_patchingArray, int size_N, int* d_boundaryEleme
 	}
 
 }
+
+__global__
+void d_calculateNormals(Faces* d_faces, int size_N, Vertex* d_normals, int normalCount)
+{
+	__shared__ Faces d_shared[128];
+	int tId = blockDim.x * blockIdx.x + threadIdx.x;
+
+	if (tId < size_N)
+	{
+		d_shared[threadIdx.x] = d_faces[tId];
+
+		float v0X = d_shared[threadIdx.x].v0PosX;
+		float v0Y = d_shared[threadIdx.x].v0PosY;
+		float v0Z = d_shared[threadIdx.x].v0PosZ;
+
+		float v1X = d_shared[threadIdx.x].v1PosX;
+		float v1Y = d_shared[threadIdx.x].v1PosY;
+		float v1Z = d_shared[threadIdx.x].v1PosZ;
+
+		float v2X = d_shared[threadIdx.x].v2PosX;
+		float v2Y = d_shared[threadIdx.x].v2PosY;
+		float v2Z = d_shared[threadIdx.x].v2PosZ;
+
+
+		//vertex has same data as normal.
+		Vertex v1_v0, v2_v0;
+		v1_v0.vx = v1X - v0X;
+		v1_v0.vy = v1Y - v0Y;
+		v1_v0.vz = v1Z - v0Z;
+
+		v2_v0.vx = v2X - v0X;
+		v2_v0.vy = v2Y - v0Y;
+		v2_v0.vz = v2Z - v0Z;
+
+		//perform cross product
+		Vertex vN;
+		vN.vx = v1_v0.vy * v2_v0.vz - v1_v0.vz * v2_v0.vy;
+		vN.vy = v1_v0.vz * v2_v0.vx - v1_v0.vx * v2_v0.vz;
+		vN.vz = v1_v0.vx * v2_v0.vy - v1_v0.vy * v2_v0.vx;
+
+		//we could add this at the beginning to skip a few iterations i guess.
+		if (tId < normalCount)
+		{
+			atomicAdd(&d_normals[tId].vx, vN.vx);
+			atomicAdd(&d_normals[tId].vy, vN.vy);
+			atomicAdd(&d_normals[tId].vz, vN.vz);
+		}
+
+
+		
+		//printf("vN.vx %f \t vN.vy %f \t vN.vz %f \n", vN.vx, vN.vy, vN.vz);
+	}
+}
+

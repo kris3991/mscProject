@@ -134,3 +134,27 @@ void  FileManager::writeNormals(TriangleMesh* tm, std::chrono::duration<double> 
 		std::cout << "normal file written" << std::endl;
 	}
 }
+
+void  FileManager::writeNormals(TriangleMesh* tm, float delta)
+{
+	std::string fileName = "normals.txt";
+	std::ofstream normalFile(fileName);
+	if (!normalFile.is_open())
+	{
+		std::cerr << "Can't open file: " << fileName << std::endl;
+		return;
+	}
+	else
+	{
+		normalFile << "Number of vertices: " << tm->vertices.size() << std::endl;
+		normalFile << "Number of faces: " << tm->faceVector.size() << std::endl;
+		normalFile << "time taken: " << std::endl;
+		normalFile << delta << std::endl;
+		for (int i = 0; i < tm->normals.size(); ++i)
+		{
+			normalFile << tm->normals[i].x << "\t" << tm->normals[i].y << "\t" << tm->normals[i].z << std::endl;
+		}
+		normalFile.close();
+		std::cout << "normal file written" << std::endl;
+	}
+}

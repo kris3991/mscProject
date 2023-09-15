@@ -13,15 +13,74 @@
 #include <random>
 #include <stdio.h>
 
+struct Vertex
+{
+	float vx;
+	float vy; 
+	float vz;
+};
+
+struct Faces
+{
+	//i dont really want to add 12 bytes more by adding normals here.
+	int v0;
+	int v1;
+	int v2;
+
+	float v0PosX;
+	float v0PosY;
+	float v0PosZ;
+
+	float v1PosX;
+	float v1PosY;
+	float v1PosZ;
+
+	float v2PosX;
+	float v2PosY;
+	float v2PosZ;
+
+
+};
+
+class preRxMeshDataStructure;
+
 class Patch
 {
 public:
-	std::vector<int> patchWithRings;
+	std::set<int> patchWithRings;
 	int* d_patchWithRings;
 	//not really needed but just in case.
 	std::vector<int> boundaryElements;
-	std::vector<int> ribonElements;
+	std::set<int> ribbonElements;
+	std::vector<int> faces;
 	int newPatchSize;
+	void fillRibbons(preRxMeshDataStructure* rm);
+};
+
+class RxMesh
+{
+protected:
+	RxMesh();
+	static RxMesh* rxMesh;
+public:
+
+	RxMesh(RxMesh& other) = delete;
+	void operator=(const RxMesh&) = delete;
+	static RxMesh* GetInstance();
+	std::vector<Vertex> vertices;
+	std::vector<Faces> faces;
+	std::vector<Vertex> normals;
+	std::vector<Patch> patches;
+	int* d_globalPatch;
+	int patchCount;
+	int patchSize;
+	void calculateNormals(FileManager* fm, TriangleMesh* tm);
+	void clearCudaData();
+
+	//cuda data.
+	Faces* d_faces = 0;
+	Vertex* d_normals = 0;
+
 };
 
 
@@ -85,7 +144,9 @@ public:
 	void clear();
 	void clearSeedComponents(TriangleMesh* tm);
 
-	void addRibbons(TriangleMesh* tm);
+	void addRibbons(TriangleMesh* tm, RxMesh* rMesh);
+
+	void fillVertices(RxMesh* rm, TriangleMesh* tm);
 
 
 };
@@ -113,3 +174,10 @@ void d_arrangePatches(int* d_patchingArray, int* d_newPatchArray,
 
 __global__
 void d_findBoundaryPoints(int* d_patchingArray, int size_N, int* d_boundaryElements, int* d_adjascentTriangles, int* d_patchPositions);
+
+__global__
+void d_calculateNormals(Faces* d_faces, int size_N, Vertex* d_normals, int normalCount);
+
+
+
+
