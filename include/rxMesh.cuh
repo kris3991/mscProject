@@ -13,6 +13,17 @@
 #include <random>
 #include <stdio.h>
 
+class Patch
+{
+public:
+	std::vector<int> patchWithRings;
+	int* d_patchWithRings;
+	//not really needed but just in case.
+	std::vector<int> boundaryElements;
+	std::vector<int> ribonElements;
+	int newPatchSize;
+};
+
 
 
 class preRxMeshDataStructure
@@ -36,18 +47,22 @@ public:
 	std::vector<int> multiComponentPatchCount;
 	std::vector<int> multiComponentPatchSize;
 	std::vector<int> h_patchingArray;
+	std::vector<int> h_tempPatchArray;
+	
+
 	std::map<int, std::vector<int>> h_adjTriMap;
 	std::vector<int> h_boundaryElements;
 
 	//cuda pointers.
 
-	int* d_adjascentTriangles;
-	int* d_faceVector;
-	int* d_triangleAdjascencyVector;
-	int* d_sizeN;
-	int* d_patchingArray;
-	int* d_seedArray;
-	int* d_boundaryElements;
+	int* d_adjascentTriangles = 0;
+	int* d_faceVector = 0;
+	int* d_triangleAdjascencyVector = 0;
+	int* d_sizeN = 0;
+	int* d_patchingArray = 0;
+	int* d_seedArray = 0;
+	int* d_boundaryElements = 0;
+	int* d_patchPositions = 0;
 	//
 	int patchSize;
 	int patchCount;
@@ -70,6 +85,8 @@ public:
 	void clear();
 	void clearSeedComponents(TriangleMesh* tm);
 
+	void addRibbons(TriangleMesh* tm);
+
 
 };
 
@@ -78,11 +95,21 @@ __global__
 void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int size_N);
 
 __global__
-void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_boundaryElements);
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles);
 
-//__global__
-//void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_count, bool* d_continue);
+
 
 
 __global__
 void d_counter(int* d_patchingArray, int size_N, int* d_count);
+
+__global__ 
+void d_computePatchCount(int* d_patchingArray, int* d_individualCounts, int size_N);
+
+
+__global__
+void d_arrangePatches(int* d_patchingArray, int* d_newPatchArray, 
+	int* d_individualCounts, int* d_prefixSum, int size_N);
+
+__global__
+void d_findBoundaryPoints(int* d_patchingArray, int size_N, int* d_boundaryElements, int* d_adjascentTriangles, int* d_patchPositions);

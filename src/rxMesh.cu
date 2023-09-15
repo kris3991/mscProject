@@ -56,6 +56,8 @@ void preRxMeshDataStructure::freeCudaData()
 		cudaFree(d_patchingArray);
 	if (d_boundaryElements != nullptr)
 		cudaFree(d_boundaryElements);
+	if (d_patchPositions != nullptr)
+		cudaFree(d_patchPositions);
 }
 
 preRxMeshDataStructure::~preRxMeshDataStructure()
@@ -290,7 +292,7 @@ void d_fillAdjascentTriangles(int* d_faceVector, int* d_adjascentTriangles, int 
 }
 
 __global__
-void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_boundaryElements)
+void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles)
 {
 	int tId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tId < size_N)
@@ -299,87 +301,33 @@ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentT
 		//store that in boundary.
 		//populate based on adj triangles. so no invalid triangle pops up in the patch.
 		//thread divergence better than o(n3)
-		int begin = blockIdx.x * blockDim.x;
-		int end = blockIdx.x* blockDim.x + blockDim.x;
 
-		int t0, t1, t2;
 		if (d_patchingArray[tId] != -1)
 		{
-			int patch = tId;
-			t0 = d_adjascentTriangles[3 * tId];
-			if (t0 > end || t0 < begin)
+			int patch = d_patchingArray[tId];
+			int t0 = d_adjascentTriangles[tId * 3];
+			int t1 = d_adjascentTriangles[tId * 3 + 1];
+			int t2 = d_adjascentTriangles[tId * 3 + 2];
+
+			if (t0 != -1)
 			{
-				atomicCAS(d_boundaryElements + patch, 0, 1);
+				atomicCAS(d_patchingArray + t0, -1, patch);
+				//printf("t0 %d \t %d \n ", t0, d_patchingArray[t0]);
+			}
+			if (t1 != -1)
+			{
+				atomicCAS(d_patchingArray + t1, -1, patch);
+				//printf("t1 %d \t %d \n ", t1, d_patchingArray[t1]);
+			}
+			if (t2 != -1)
+			{
+				atomicCAS(d_patchingArray + t2, -1, patch);
+				//printf("t2 %d \t %d \n ", t2, d_patchingArray[t2]);
 			}
 
-			t1 = d_adjascentTriangles[3 * tId + 1];
-
-			if (t1 > end || t1 < begin)
-			{
-				atomicCAS(d_boundaryElements + patch, 0, 1);
-			}
-
-
-			t2 = d_adjascentTriangles[3 * tId + 2];
-
-			if (t2 > end || t2 < begin)
-			{
-				atomicCAS(d_boundaryElements + patch, 0, 1);
-			}
-
-
-			if (t0 != -1 && atomicCAS(d_patchingArray + t0, -1, blockIdx.x))
-			{
-				
-			}
-			if (t1 != -1 && atomicCAS(d_patchingArray + t1, -1, blockIdx.x))
-			{
-				
-			}
-			if (t2 != -1 && atomicCAS(d_patchingArray + t2, -1, blockIdx.x))
-			{
-				
-			}
 		}
 	}
 }
-
-//__global__ void d_populatePatchingArray(int* d_patchingArray, int size_N, int* d_adjascentTriangles, int* d_count, bool* d_continue) {
-//	int tId = blockIdx.x * blockDim.x + threadIdx.x;
-//
-//	while (*d_continue) {
-//		if (tId < size_N) {
-//			int t0, t1, t2;
-//
-//			if (d_patchingArray[tId] != -1) 
-//			{
-//				t0 = d_adjascentTriangles[3 * tId];
-//				t1 = d_adjascentTriangles[3 * tId + 1];
-//				t2 = d_adjascentTriangles[3 * tId + 2];
-//
-//				if (t0 != -1 && d_patchingArray[t0] == -1) {
-//					d_patchingArray[t0] = t0;
-//					*d_continue = true;
-//				}
-//				if (t1 != -1 && d_patchingArray[t1] == -1) {
-//					d_patchingArray[t1] = t1;
-//					*d_continue = true;
-//				}
-//				if (t2 != -1 && d_patchingArray[t2] == -1) {
-//					d_patchingArray[t2] = t2;
-//					*d_continue = true;
-//				}
-//			}
-//		}
-//		__syncthreads();
-//
-//		if (tId == 0) {
-//			*d_continue = false;
-//		}
-//		__syncthreads();
-//	}
-//}
-
 
 
 __global__
@@ -398,6 +346,7 @@ void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
 {
 	//there is no point in parallelising this block.
 	//and will only be done once.
+	
 	for (int i = 0; i < h_seedElements.size(); ++i)
 	{
 		int currFace = h_seedElements[i];
@@ -410,12 +359,8 @@ void preRxMeshDataStructure::h_fillPatchingArrayWithSeedPoints()
 		std::cout << "memcpy failed for d_patchingArray" << std::endl;
 	}
 
-	//fill 0 for boundary just in case.
-	status = cudaMemcpy(d_boundaryElements, h_boundaryElements.data(), sizeof(int) * h_patchingArray.size(), cudaMemcpyHostToDevice);
-	if (status != cudaSuccess)
-	{
-		std::cout << "memcpy failed for d_patchingArray" << std::endl;
-	}
+	std::vector<int> test2(h_patchingArray.size(), -1);
+	status = cudaMemcpy(test2.data(), d_patchingArray, sizeof(int) * h_patchingArray.size(), cudaMemcpyDeviceToHost); 
 
 }
 
@@ -437,6 +382,8 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 
 	clearSeedComponents(tm);
 	h_initialiseSeedElements(tm, cm, pc);
+	h_tempPatchArray.resize(h_patchingArray.size());
+	std::fill(h_tempPatchArray.begin(), h_tempPatchArray.end(), -1);
 
 	// i am putting 5 loops as convergence max.
 	
@@ -445,8 +392,6 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 	do{
 		h_fillPatchingArrayWithSeedPoints();
 		//clear the gpu values 
-		cudaMemset(d_patchingArray, -1, tm->faceVector.size()/3);
-		cudaMemset(d_boundaryElements, 0, tm->faceVector.size() / 3);
 
 		int threadCount = patchSize;
 		int blockCount = patchCount;
@@ -455,62 +400,185 @@ void preRxMeshDataStructure::h_populatePatches(TriangleMesh* tm, bool doIteratio
 		//set any random non zero value.
 		int count = 0;
 		int* d_count = 0;
+
+
+		int* d_newPatchArray = 0;
+		cudaMalloc(&d_newPatchArray, sizeof(int) * h_patchingArray.size());
+		
+		std::vector<int> indidualCounter(patchCount, 0);
+		std::vector<int> prefixSum(patchCount, 0);
+		std::vector<int> h_newPatchingArray(h_patchingArray.size(), 0);
+
+
+		int* d_individualCounts = 0;
+		cudaMalloc(&d_individualCounts, sizeof(int) * patchCount);
+		cudaMemcpy(d_individualCounts, indidualCounter.data(), sizeof(int)* patchCount, cudaMemcpyHostToDevice);
+
+
+		int* d_prefixSum = 0;
+		cudaMalloc(&d_prefixSum, sizeof(int) * patchCount);
+
 		cudaMalloc(&d_count, sizeof(int));
 		cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
 		//i was using blelloch earlier to get the sum of all face values.
-		//buts its easier to check for the number of -1s in the patching array
+		//but the reference in nvidea is for a single block.
 		/*for (int i = 0; i < 3; ++i)*/
+
+		
 		do
 		{
 			cudaMemcpy(d_count, &count, sizeof(int), cudaMemcpyHostToDevice);
-			d_populatePatchingArray << <blockCount, threadCount >> > (d_patchingArray, size_N, d_adjascentTriangles, d_boundaryElements);
+			d_populatePatchingArray << <blockCount, threadCount >> > (d_patchingArray, size_N, d_adjascentTriangles);
 			cudaDeviceSynchronize();
+			
 			d_counter << <blockCount, threadCount >> > (d_patchingArray, size_N, d_count);
 			cudaMemcpy(&count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
 		} while (count != 0);
 
-		
-		cudaMemcpy(h_boundaryElements.data(), d_boundaryElements, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+		cudaDeviceSynchronize();
 
-		//in the next iteration choose a seed point that is not a boundary element.
-		//since i have chosen seed points which are not really boundary the following step could be possibly be skipped for more performance.
-		//adding a condition to skip this.
-		h_seedElements.clear();
-		if (doIterations)
-		{
-			//nothing to parallelise here.
-			for (int i = 0; i < patchCount; ++i)
-			{
-				int random_number;
-				int begin = i * patchSize;
-				int end = (i + 1) * patchSize;
-				std::uniform_int_distribution<> distr(begin, end);
-				int val = 1;
-				//this loop will almost always be 1,for example in a patch(size 180) of a sphere obj of 960 faces, 10 are boundary around 0.02 percent in each patch.
-				//while worst case is o(n3) here this will generally be o(1).
-				while (val)
-				{
-					random_number = distr(gen);
-					val = h_boundaryElements[random_number];
-				}
-				h_seedElements.push_back(random_number);
-			}
-			loopCounter--;
-		}
-		else
-		{
-			loopCounter = 0;
-		}
-		cudaFree(d_count);
-		//clear all the cpu arrays.
-		std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
-		std::fill(h_boundaryElements.begin(), h_boundaryElements.end(), 0);
 	
 
+		//grouping code
+		//blelloch code given in nvidea works only for one block.
+		
+		d_computePatchCount << <blockCount, threadCount >> > (d_patchingArray, d_individualCounts, h_patchingArray.size());
+		
+
+		cudaMemcpy(indidualCounter.data(), d_individualCounts, patchCount * sizeof(int), cudaMemcpyDeviceToHost);
+
+		prefixSum[0] = 0;
+		for (int i = 1; i < patchCount; ++i) {
+			prefixSum[i] = prefixSum[i - 1] + indidualCounter[i - 1];
+		}
+
+		cudaMemcpy(d_prefixSum, prefixSum.data(), sizeof(int) * patchCount, cudaMemcpyHostToDevice);
+		cudaMemset(d_individualCounts, 0, patchCount * sizeof(int));
+
+		d_arrangePatches << <blockCount, threadCount >> > (d_patchingArray, d_newPatchArray, d_individualCounts, d_prefixSum, h_patchingArray.size());
+
+		cudaMemcpy(h_newPatchingArray.data(), d_newPatchArray, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+		h_seedElements.clear();
+		//select new seed points.
+		int begin{ 0 };
+		int end{ 0 };
+		int temp{ 0 };
+
+		//do this only for the last loop
+		if(loopCounter == 1)
+			cudaMemcpy(h_tempPatchArray.data(), d_patchingArray, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+
+		for (int i = 0; i < h_newPatchingArray.size(); ++i)
+		{
+		//update seed step.
+		// basically you update the seed points to make it centralised.	
+			if (begin < patchSize)
+			{
+				begin = i * patchSize;
+				end = i * patchSize + patchSize;
+
+				int t0{ -1 }, t1{ -1 }, t2{ -1 };
+				bool breakLoop = false;
+				//safety.
+				int count = 50;
+				while (count && !breakLoop)
+				{
+
+					temp = *select_randomly(h_newPatchingArray.begin() + begin, h_newPatchingArray.begin() + end - 1);
+					t0 = h_adjTriMap[temp][0];
+					t1 = h_adjTriMap[temp][1];
+					t2 = h_adjTriMap[temp][2];
+
+					if (h_tempPatchArray[t0] == i && h_tempPatchArray[t1] == i && h_tempPatchArray[t2] == i)
+					{
+						breakLoop = true;
+					}
+					count--;
+				}
+				h_seedElements.push_back(temp);
+			}
+		}
+		
+		cudaMemset(d_patchingArray, -1, size_N * sizeof(int));
+		cudaMemcpy(d_patchingArray, h_newPatchingArray.data(), sizeof(int) * h_newPatchingArray.size(), cudaMemcpyHostToDevice);
+		std::fill(h_patchingArray.begin(), h_patchingArray.end(), -1);
+	
+	
+		loopCounter--;
+		cudaFree(d_prefixSum);
+		cudaFree(d_newPatchArray);
+		cudaFree(d_individualCounts);
 
 	}while (loopCounter);
 
+	cudaMemcpy(h_patchingArray.data(), d_patchingArray, sizeof(int)* h_patchingArray.size(), cudaMemcpyDeviceToHost);
+	
 }
 
 
+void preRxMeshDataStructure::addRibbons(TriangleMesh* tm)
+{
+	int size_N = tm->faceVector.size() / 3;
+	
+	std::vector<int> NegData(size_N, -1);
 
+	cudaMemcpy(d_boundaryElements, NegData.data(), sizeof(int) * size_N, cudaMemcpyHostToDevice);
+
+	int threadCount = patchSize;
+	int blockCount = patchCount;
+
+	cudaMalloc(&d_patchPositions, size_N * sizeof(int));
+	cudaMemcpy(d_patchPositions, h_tempPatchArray.data(), size_N * sizeof(int), cudaMemcpyHostToDevice);
+
+	d_findBoundaryPoints << <blockCount, threadCount >> > (d_patchingArray, size_N, d_boundaryElements, d_adjascentTriangles, d_patchPositions);
+	cudaMemcpy(h_boundaryElements.data(), d_boundaryElements, sizeof(int) * size_N, cudaMemcpyDeviceToHost);
+
+	int a = 30;
+}
+
+
+__global__ void d_computePatchCount(int* d_patchingArray, int* d_individualCounts, int size_N) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	if (tId < size_N) {
+		int value = d_patchingArray[tId];
+		atomicAdd(&d_individualCounts[value], 1);
+	}
+}
+
+__global__ void d_arrangePatches(int* d_patchingArray, int* d_newPatchArray, int* d_individualCounts, int* d_prefixSum, int size_N) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	if (tId < size_N) {
+		int value = d_patchingArray[tId];
+		//printf("%d \n", value);
+		int pos = atomicAdd(&d_individualCounts[value], 1);
+		d_newPatchArray[d_prefixSum[value] + pos] = tId;
+	}
+}
+
+
+__global__
+void d_findBoundaryPoints(int* d_patchingArray, int size_N, int* d_boundaryElements, int* d_adjascentTriangles, int* d_patchPositions)
+{
+	int tId = blockDim.x * blockIdx.x + threadIdx.x;
+	if (tId < size_N)
+	{
+		int current = d_patchingArray[tId];
+		if (current != -1)
+		{
+			int begin = blockIdx.x * blockDim.x;
+			int end = blockIdx.x * blockDim.x + blockDim.x;
+			int t0{ -1 }, t1{ -1 }, t2{ -1 };
+			t0 = d_adjascentTriangles[3 * current];
+			t1 = d_adjascentTriangles[3 * current + 1];
+			t2 = d_adjascentTriangles[3 * current + 2];
+			if (t0 != -1 && d_patchPositions[t0] != blockIdx.x)
+				d_boundaryElements[current] = blockIdx.x;
+			if (t1 != -1 && d_patchPositions[t1] != blockIdx.x)
+				d_boundaryElements[current] = blockIdx.x;
+			if (t2 != -1 && d_patchPositions[t2] != blockIdx.x)
+				d_boundaryElements[current] = blockIdx.x;
+		}
+		
+	}
+
+}

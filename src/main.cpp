@@ -411,6 +411,7 @@ int main(int argc, char** argv)
 
 					//patching algorithm.
 					rx->h_populatePatches(tm, true, cm, patchCount);
+                    rx->addRibbons(tm);
 					rxMeshStart = false;
 
 				}
